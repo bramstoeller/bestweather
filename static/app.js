@@ -78,9 +78,22 @@ function profileKeyFromActivity(seg) {
   return parseCode(seg) ? seg : null;
 }
 
+function profileRelevant(key) {
+  // Hide clearly out-of-season profiles: no skating prompt at 30°C, no beach in
+  // a frost. Uses today's forecast temperature when known, else the month.
+  const temp = state.days.length ? state.days[0].temp_max : null;
+  const m = new Date().getMonth();
+  const warm = temp != null ? temp >= 16 : (m >= 3 && m <= 9);
+  const cold = temp != null ? temp <= 9 : (m <= 2 || m >= 10);
+  if (key === "skating" || key === "skiing") return cold;
+  if (key === "beach") return warm;
+  return true;
+}
+
 function renderProfiles() {
   const el = $("profiles");
-  const keys = [...PROFILE_ORDER, ...getCustoms().map(customCode)];
+  const builtins = PROFILE_ORDER.filter((k) => k === "general" || k === state.profileKey || profileRelevant(k));
+  const keys = [...builtins, ...getCustoms().map(customCode)];
   let html = keys.map((pk) => {
     const active = pk === state.profileKey ? " active" : "";
     return `<button class="profile${active}" data-pk="${escapeAttr(pk)}" title="${escapeAttr(profileDesc(pk))}">` +
@@ -335,7 +348,7 @@ function onMessage(ev) {
   } else if (msg.type === "complete") {
     state.scan.done = msg.total;
     updateDays(msg.days);
-    renderStatus(true); renderSources(); renderForecast();
+    renderStatus(true); renderSources(); renderForecast(); renderProfiles();
   }
 }
 function updateDays(days) {
