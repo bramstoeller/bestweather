@@ -413,6 +413,10 @@ function updateChrome() {
   const tag = $("tagline");
   if (tag) tag.style.display = (state.place || state.notFound) ? "none" : "";
 }
+function sourceLinkFor(name) {
+  const s = (state.sources || []).find((x) => x.name === name);
+  return s ? (s.link || s.url) : "#";
+}
 function renderSources() {
   const sources = state.scan && state.scan.sources.length ? state.scan.sources : state.sources;
   if (!sources || !sources.length) { $("sourcesBox").hidden = true; return; }
@@ -421,7 +425,7 @@ function renderSources() {
   $("sourceList").innerHTML = sources.map((src) => {
     const st = statuses[src.name] || "";
     const tag = src.region && src.region !== "global" ? `<span class="tag">${src.region}</span>` : "";
-    return `<a class="src-item" href="${escapeAttr(src.url)}" target="_blank" rel="noopener">` +
+    return `<a class="src-item" href="${escapeAttr(src.link || src.url)}" target="_blank" rel="noopener">` +
       `<span class="dot ${st}"></span>${escapeHtml(src.name)}${tag}</a>`;
   }).join("");
 }
@@ -461,7 +465,7 @@ function renderForecast() {
         </div>
         <div class="today-emoji">${emojiFor(today.weather_code, today.precip_mm, today.temp_max)}</div>
       </div>
-      <div class="today-source">${escapeHtml(t(state.lang, "source"))}: ${escapeHtml(today.source || "-")}</div>
+      <div class="today-source">${escapeHtml(t(state.lang, "source"))}: <a class="src-link" href="${escapeAttr(sourceLinkFor(today.source))}" target="_blank" rel="noopener">${escapeHtml(today.source || "-")}</a></div>
       ${state.expanded.has(today.date) ? hoursHtml(today, true) : ""}
     </div>`;
 
@@ -472,7 +476,10 @@ function renderForecast() {
         <div class="day-row">
           <div><div class="dow">${fmtDow(d.date)}</div><div class="date">${fmtDate(d.date)}</div></div>
           <div class="emoji">${emojiFor(d.weather_code, d.precip_mm, d.temp_max)}</div>
-          <div class="meta">${escapeHtml(metaLine(d))}</div>
+          <div class="mid">
+            <div class="meta">${escapeHtml(metaLine(d))}</div>
+            ${d.source ? `<a class="src" href="${escapeAttr(sourceLinkFor(d.source))}" target="_blank" rel="noopener">${escapeHtml(d.source)}</a>` : ""}
+          </div>
           <div class="temps"><span class="tmax">${r0(d.temp_max)}°</span>${d.temp_min != null ? `<span class="tmin"> / ${r0(d.temp_min)}°</span>` : ""}</div>
         </div>
         ${state.expanded.has(d.date) ? hoursHtml(d, false) : ""}
@@ -482,6 +489,9 @@ function renderForecast() {
   $("forecast").innerHTML = todayHtml + `<div class="grid">${daysHtml}</div>`;
   $("forecast").querySelectorAll("[data-day]").forEach((el) =>
     el.addEventListener("click", () => toggleDay(el.dataset.day)));
+  // Source links shouldn't also toggle the day's hours.
+  $("forecast").querySelectorAll("a").forEach((a) =>
+    a.addEventListener("click", (e) => e.stopPropagation()));
 }
 function toggleDay(date) {
   if (state.expanded.has(date)) state.expanded.delete(date); else state.expanded.add(date);

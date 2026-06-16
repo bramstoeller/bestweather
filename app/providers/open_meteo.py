@@ -76,7 +76,10 @@ class OpenMeteoEnsemble(Provider):
         self.models = models  # list of (display_name, model_id, region)
 
     def sources(self):
-        return [{"name": n, "url": self.url, "keyless": True, "region": r} for n, _, r in self.models]
+        return [
+            {"name": n, "url": self.url, "keyless": True, "region": r, "model": m}
+            for n, m, r in self.models
+        ]
 
     async def fetch_sources(self, client, lat, lon):
         params = {

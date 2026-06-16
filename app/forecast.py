@@ -16,6 +16,28 @@ from .scoring import Profile, merge_best
 Emit = Callable[[dict], Awaitable[None]]
 
 
+def _web_link(source: dict, lat: float, lon: float) -> str:
+    """Best public page for a source at this place (falls back to its homepage)."""
+    url = source["url"]
+    la, lo = f"{lat:.4f}", f"{lon:.4f}"
+    if "open-meteo.com" in url:
+        link = (
+            f"https://open-meteo.com/en/docs?latitude={la}&longitude={lo}"
+            "&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max"
+        )
+        model = source.get("model")
+        return f"{link}&models={model}" if model else link
+    if "yr.no" in url:
+        return f"https://www.yr.no/en/forecast/daily-table/{la},{lo}"
+    if "wttr.in" in url:
+        return f"https://wttr.in/{la},{lo}"
+    if "openweathermap.org" in url:
+        return f"https://openweathermap.org/weathermap?lat={la}&lon={lo}&zoom=10"
+    if "visualcrossing.com" in url:
+        return f"https://www.visualcrossing.com/weather/weather-data-services/{la},{lo}"
+    return url
+
+
 async def _cached_fetch(provider: Provider, client, lat, lon) -> dict:
     key = f"fc:{provider.name}:{round(lat, 2)}:{round(lon, 2)}"
     cached = await cache.get(key)
@@ -50,6 +72,8 @@ async def run_best_weather(lat: float, lon: float, profile: Profile, emit: Emit)
     sources = []
     for p in providers:
         sources.extend(p.sources())
+    for s in sources:
+        s["link"] = _web_link(s, lat, lon)
     total = len(sources)
     await emit({"type": "providers", "sources": sources, "total": total})
 
