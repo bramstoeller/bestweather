@@ -96,11 +96,15 @@ function renderProfiles() {
   const builtins = PROFILE_ORDER.filter((k) => k === "general" || k === state.profileKey || profileRelevant(k));
   const keys = [...builtins, ...getCustoms().map(customCode)];
   let html = keys.map((pk) => {
-    const active = pk === state.profileKey ? " active" : "";
-    return `<button class="profile${active}" data-pk="${escapeAttr(pk)}" title="${escapeAttr(profileDesc(pk))}">` +
-      `<span class="ico">${profileIcon(pk)}</span>${escapeHtml(profileLabel(pk))}</button>`;
+    const active = pk === state.profileKey;
+    const label = active ? ` ${escapeHtml(profileLabel(pk))}` : "";
+    const tip = `${profileLabel(pk)} · ${profileDesc(pk)}`;
+    return `<button class="profile${active ? " active" : ""}" data-pk="${escapeAttr(pk)}" ` +
+      `title="${escapeAttr(tip)}" aria-label="${escapeAttr(profileLabel(pk))}">` +
+      `<span class="ico">${profileIcon(pk)}</span>${label}</button>`;
   }).join("");
-  html += `<button class="profile edit" id="editProfiles">✏️ ${t(state.lang, "customize")}</button>`;
+  const editTip = escapeAttr(t(state.lang, "customize"));
+  html += `<button class="profile edit" id="editProfiles" title="${editTip}" aria-label="${editTip}">✏️</button>`;
   el.innerHTML = html;
   el.querySelectorAll("[data-pk]").forEach((b) =>
     b.addEventListener("click", () => selectProfile(b.dataset.pk)));

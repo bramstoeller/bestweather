@@ -23,7 +23,7 @@
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; }
+html, body { margin: 0; padding: 0; overflow-x: hidden; }
 body {
   background: var(--bg);
   color: var(--text);
@@ -79,9 +79,9 @@ header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .profile {
   flex: none; display: inline-flex; align-items: center; gap: 6px;
   border: 1px solid var(--border); background: var(--card); color: var(--text);
-  border-radius: 999px; padding: 8px 13px; font-size: 0.85rem; cursor: pointer; white-space: nowrap;
+  border-radius: 999px; padding: 9px 12px; font-size: 0.85rem; cursor: pointer; white-space: nowrap;
 }
-.profile .ico { font-size: 1rem; }
+.profile .ico { font-size: 1.2rem; line-height: 1; }
 .profile.active { background: var(--accent); border-color: var(--accent); color: #1c1305; font-weight: 600; }
 .profile.edit { color: var(--muted); }
 
