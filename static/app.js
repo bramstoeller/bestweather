@@ -421,10 +421,9 @@ function updateDays(days) {
 // ---------- Rendering ----------
 function setStatusText(text) { $("status").innerHTML = text ? `<span>${escapeHtml(text)}</span>` : ""; }
 
-function renderScan(done = false) {
-  const s = state.scan;
-  if (!s || !s.total || done) { $("status").innerHTML = ""; return; }
-  $("status").innerHTML = `<span class="spinner"></span><span>${escapeHtml(t(state.lang, "scanning", { done: s.done, total: s.total }))}</span>`;
+function renderScan() {
+  // No top loader; the source list at the bottom shows progress as dots fill in.
+  $("status").innerHTML = "";
 }
 function updateChrome() {
   const tag = $("tagline");

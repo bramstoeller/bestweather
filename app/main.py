@@ -71,7 +71,9 @@ def _file(path: Path) -> FileResponse:
     media, _ = mimetypes.guess_type(str(path))
     if path.suffix == ".webmanifest":
         media = "application/manifest+json"
-    return FileResponse(path, media_type=media)
+    # Revalidate every load (ETag-based) so a deploy is picked up immediately
+    # instead of serving a stale cached app.js/styles.css.
+    return FileResponse(path, media_type=media, headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/{full_path:path}")
