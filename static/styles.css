@@ -116,12 +116,13 @@ body {
 .today-meta { font-size: 0.85rem; margin-top: 4px; }
 .today-source { font-size: 0.72rem; opacity: 0.85; margin-top: 8px; }
 
-.grid { display: grid; gap: 8px; }
+.grid { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
 .day {
+  min-width: 0;
   background: var(--card); border: 1px solid var(--border); border-radius: 12px;
   padding: 11px 14px; cursor: pointer;
 }
-.day-row { display: grid; grid-template-columns: 44px 28px 1fr auto; align-items: center; gap: 10px; }
+.day-row { display: grid; grid-template-columns: 44px 28px 1fr auto; align-items: center; gap: 10px; min-width: 0; }
 .day.changed { animation: pop 0.5s ease; }
 @keyframes pop {
   0% { box-shadow: 0 0 0 0 var(--accent-2); }
@@ -137,10 +138,15 @@ body {
 .day .tmin { color: var(--muted); font-size: 0.9rem; }
 
 .hours {
-  display: flex; gap: 12px; overflow-x: auto; scrollbar-width: thin;
-  padding-top: 9px; margin-top: 9px; border-top: 1px solid var(--border);
+  display: flex; gap: 12px; overflow-x: auto;
+  padding: 9px 0 4px; margin-top: 9px; border-top: 1px solid var(--border);
+  scrollbar-width: thin; scrollbar-color: var(--border) transparent;
 }
-.today-card .hours { border-top-color: rgba(0, 0, 0, 0.15); }
+.hours::-webkit-scrollbar { height: 6px; }
+.hours::-webkit-scrollbar-track { background: transparent; }
+.hours::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+.today-card .hours { border-top-color: rgba(0, 0, 0, 0.15); scrollbar-color: rgba(0, 0, 0, 0.25) transparent; }
+.today-card .hours::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.22); }
 .hour { flex: none; text-align: center; font-size: 0.72rem; min-width: 46px; }
 .hour .h-time { opacity: 0.7; }
 .hour .h-emoji { font-size: 1.1rem; }

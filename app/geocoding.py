@@ -56,14 +56,31 @@ async def reverse(lat: float, lon: float, lang: str = "en") -> Optional[dict]:
         resp.raise_for_status()
         data = resp.json()
 
-    name = data.get("city") or data.get("locality") or data.get("principalSubdivision")
+    # BigDataCloud's city/locality can be a municipality the geocoder doesn't
+    # know (e.g. "Lingewaard"). Its administrative levels usually also list the
+    # actual town ("Bemmel"), so we try several candidate names and keep the
+    # searchable place nearest to the coordinates. That makes the resulting
+    # name resolvable on a page reload and gives clean country/region names.
+    admin = (data.get("localityInfo") or {}).get("administrative") or []
+    admin_names = [a.get("name") for a in admin if a.get("name")]
+    candidates: List[str] = []
+    for nm in [data.get("city"), data.get("locality"), *reversed(admin_names)]:
+        if nm and nm not in candidates:
+            candidates.append(nm)
+
     place = None
-    if name:
-        candidates = await search(name, lang, limit=10)
-        place = _nearest(candidates, lat, lon)
+    best_d = None
+    for nm in candidates[:6]:
+        for c in await search(nm, lang, limit=10):
+            d = (c["lat"] - lat) ** 2 + (c["lon"] - lon) ** 2
+            if d <= 0.3 ** 2 and (best_d is None or d < best_d):
+                place, best_d = c, d
+        if place is not None and best_d <= 0.05 ** 2:
+            break
+
     if place is None:
         place = {
-            "name": name or "?",
+            "name": data.get("city") or data.get("locality") or "?",
             "admin1": data.get("principalSubdivision"),
             "country": data.get("countryName"),
             "country_code": data.get("countryCode"),
@@ -86,11 +103,3 @@ def _place(r: dict) -> dict:
     }
 
 
-def _nearest(candidates: List[dict], lat: float, lon: float, max_deg: float = 0.75):
-    """Closest candidate to the coordinates, or None if all are far away."""
-    best, best_d = None, max_deg ** 2
-    for c in candidates:
-        d = (c["lat"] - lat) ** 2 + (c["lon"] - lon) ** 2
-        if d < best_d:
-            best, best_d = c, d
-    return best
