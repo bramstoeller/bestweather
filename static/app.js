@@ -32,6 +32,7 @@ const state = {
   changedDates: new Set(),
   profileKey: localStorage.getItem("mw_profile") || "general",
   scan: null,
+  sources: [],
   ws: null,
   reqId: 0,
   notFound: null,
@@ -339,6 +340,7 @@ async function subscribe(place) {
 function onMessage(ev) {
   const msg = JSON.parse(ev.data);
   if (msg.type === "providers") {
+    state.sources = msg.sources;
     state.scan = { done: 0, total: msg.total, sources: msg.sources, statuses: {} };
     renderStatus(); renderSources();
   } else if (msg.type === "update") {
@@ -385,11 +387,12 @@ function renderStatus(done = false) {
   $("status").innerHTML = `${done ? "" : '<span class="spinner"></span>'}<span>${escapeHtml(text)}</span>`;
 }
 function renderSources() {
-  const s = state.scan;
-  if (!s || !s.sources.length) { $("sourcesBox").hidden = true; return; }
+  const sources = state.scan && state.scan.sources.length ? state.scan.sources : state.sources;
+  if (!sources || !sources.length) { $("sourcesBox").hidden = true; return; }
+  const statuses = (state.scan && state.scan.statuses) || {};
   $("sourcesBox").hidden = false;
-  $("sourceList").innerHTML = s.sources.map((src) => {
-    const st = s.statuses[src.name] || "";
+  $("sourceList").innerHTML = sources.map((src) => {
+    const st = statuses[src.name] || "";
     const tag = src.region && src.region !== "global" ? `<span class="tag">${src.region}</span>` : "";
     return `<a class="src-item" href="${escapeAttr(src.url)}" target="_blank" rel="noopener">` +
       `<span class="dot ${st}"></span>${escapeHtml(src.name)}${tag}</a>`;
@@ -400,12 +403,11 @@ function fmtDow(date) { return I18N[state.lang].weekdays[new Date(date + "T00:00
 function fmtDate(date) { const d = new Date(date + "T00:00:00"); return `${d.getDate()} ${I18N[state.lang].months[d.getMonth()]}`; }
 function r0(n) { return Math.round(n); }
 function precipText(d) {
-  if ((d.precip_mm || 0) < 0.2 && (d.precip_prob == null || d.precip_prob < 20)) return t(state.lang, "dry");
-  let s = `${(d.precip_mm || 0).toFixed(1)} mm`;
-  if (d.precip_prob != null) s += ` · ${d.precip_prob}%`;
-  return s;
+  if ((d.precip_mm || 0) >= 0.2) return `${(d.precip_mm).toFixed(1)} mm`;
+  if (d.precip_prob != null && d.precip_prob >= 30) return `${d.precip_prob}%`;
+  return t(state.lang, "dry");
 }
-function windText(d) { return d.wind_kmh != null ? `${r0(d.wind_kmh)} km/h ${t(state.lang, "wind")}` : ""; }
+function windText(d) { return d.wind_kmh != null ? `${r0(d.wind_kmh)} km/h` : ""; }
 function metaLine(d) { return [precipText(d), windText(d)].filter(Boolean).join(" · "); }
 
 function hoursHtml(d, isToday) {
@@ -432,7 +434,7 @@ function renderForecast() {
         </div>
         <div class="today-emoji">${emojiFor(today.weather_code, today.precip_mm, today.temp_max)}</div>
       </div>
-      <div class="today-source">${escapeHtml(t(state.lang, "source"))}: ${escapeHtml(today.source || "—")}</div>
+      <div class="today-source">${escapeHtml(t(state.lang, "source"))}: ${escapeHtml(today.source || "-")}</div>
       ${state.expanded.has(today.date) ? hoursHtml(today, true) : ""}
     </div>`;
 
@@ -554,6 +556,12 @@ $("themeBtn").addEventListener("click", toggleTheme);
 $("langBtn").addEventListener("click", toggleLang);
 applyTheme();
 applyLang();
+
+// Always show the source links (attribution), even before a forecast loads.
+fetch("/api/health").then((r) => r.json()).then((d) => {
+  state.sources = d.sources || [];
+  renderSources();
+}).catch(() => {});
 
 (function boot() {
   const parsed = parseUrl();
