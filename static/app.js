@@ -5,13 +5,13 @@
 const PROFILE_ORDER = ["general", "beach", "bbq", "outdoor", "windwater", "skating", "skiing"];
 // temp/precip/wind targets + weights (tw/pw/ww, 0-4) per profile.
 const PROFILE_DEFAULTS = {
-  general: { temp: 24, precip: 0, wind: 10, tw: 2, pw: 3, ww: 1 },
-  beach: { temp: 29, precip: 0, wind: 8, tw: 3, pw: 2, ww: 1 },
-  bbq: { temp: 24, precip: 0, wind: 8, tw: 1, pw: 3, ww: 2 },
-  outdoor: { temp: 16, precip: 0, wind: 16, tw: 2, pw: 2, ww: 1 },
-  windwater: { temp: 20, precip: 0, wind: 32, tw: 1, pw: 1, ww: 3 },
-  skating: { temp: -6, precip: 0, wind: 8, tw: 3, pw: 2, ww: 1 },
-  skiing: { temp: -3, precip: 6, wind: 12, tw: 2, pw: 3, ww: 1 },
+  general: { temp: 24, precip: 0, wind: 10, tw: 3, pw: 4, ww: 2 },
+  beach: { temp: 28, precip: 0, wind: 10, tw: 3, pw: 4, ww: 2 },
+  bbq: { temp: 25, precip: 0, wind: 0, tw: 1, pw: 4, ww: 3 },
+  outdoor: { temp: 16, precip: 0, wind: 15, tw: 2, pw: 4, ww: 2 },
+  windwater: { temp: 25, precip: 0, wind: 25, tw: 2, pw: 1, ww: 4 },
+  skating: { temp: -5, precip: 0, wind: 0, tw: 4, pw: 2, ww: 2 },
+  skiing: { temp: -5, precip: 0, wind: 0, tw: 4, pw: 3, ww: 1 },
 };
 const WEIGHTS_FALLBACK = { tw: 2, pw: 3, ww: 1 };
 const PROFILE_ICON = {

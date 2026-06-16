@@ -18,13 +18,13 @@ Criterion = Callable[[DayForecast], float]
 # Default ideal point + weights per built-in profile:
 # (temp °C, precip mm, wind km/h, temp weight, precip weight, wind weight).
 DEFAULTS: Dict[str, Tuple[float, float, float, int, int, int]] = {
-    "general": (24, 0, 10, 2, 3, 1),
-    "beach": (29, 0, 8, 3, 2, 1),
-    "bbq": (24, 0, 8, 1, 3, 2),
-    "outdoor": (16, 0, 16, 2, 2, 1),
-    "windwater": (20, 0, 32, 1, 1, 3),
-    "skating": (-6, 0, 8, 3, 2, 1),
-    "skiing": (-3, 6, 12, 2, 3, 1),
+    "general": (24, 0, 10, 3, 4, 2),
+    "beach": (28, 0, 10, 3, 4, 2),
+    "bbq": (25, 0, 0, 1, 4, 3),
+    "outdoor": (16, 0, 15, 2, 4, 2),
+    "windwater": (25, 0, 25, 2, 1, 4),
+    "skating": (-5, 0, 0, 4, 2, 2),
+    "skiing": (-5, 0, 0, 4, 3, 1),
 }
 DEFAULT = "general"
 WEIGHTS_FALLBACK = (2, 3, 1)
