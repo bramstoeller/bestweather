@@ -20,10 +20,12 @@ class OpenMeteo(Provider):
     url = "https://open-meteo.com"
     region = "global"
 
-    def __init__(self, name: str = "Open-Meteo", model: Optional[str] = None, hourly: bool = False):
+    def __init__(self, name: str = "Open-Meteo", model: Optional[str] = None,
+                 hourly: bool = False, region: str = "global"):
         self.name = name
         self.model = model
         self.with_hourly = hourly
+        self.region = region
 
     async def fetch(self, client, lat, lon) -> List[DayForecast]:
         params = {
@@ -60,6 +62,64 @@ class OpenMeteo(Provider):
         if self.with_hourly and "hourly" in data:
             _attach_hourly(days, data["hourly"])
         return days
+
+
+class OpenMeteoEnsemble(Provider):
+    """Many national models in one request, exposed as one source per model."""
+
+    url = "https://open-meteo.com"
+    region = "global"
+    requires_key = False
+
+    def __init__(self, models):
+        self.name = "Open-Meteo ensemble"
+        self.models = models  # list of (display_name, model_id, region)
+
+    def sources(self):
+        return [{"name": n, "url": self.url, "keyless": True, "region": r} for n, _, r in self.models]
+
+    async def fetch_sources(self, client, lat, lon):
+        params = {
+            "latitude": lat,
+            "longitude": lon,
+            "daily": _DAILY,
+            "forecast_days": 16,
+            "timezone": "auto",
+            "models": ",".join(m for _, m, _ in self.models),
+        }
+        resp = await client.get("https://api.open-meteo.com/v1/forecast", params=params)
+        resp.raise_for_status()
+        daily = resp.json()["daily"]
+        times = daily["time"]
+
+        out = {}
+        for name, mid, _ in self.models:
+            tmax = daily.get(f"temperature_2m_max_{mid}")
+            if not tmax or all(v is None for v in tmax):
+                continue
+            tmin = daily.get(f"temperature_2m_min_{mid}")
+            psum = daily.get(f"precipitation_sum_{mid}")
+            pprob = daily.get(f"precipitation_probability_max_{mid}")
+            wind = daily.get(f"wind_speed_10m_max_{mid}")
+            code = daily.get(f"weather_code_{mid}")
+            days = []
+            for i, date in enumerate(times):
+                if tmax[i] is None:
+                    continue
+                days.append(
+                    DayForecast(
+                        date=date,
+                        temp_max=tmax[i],
+                        temp_min=tmin[i] if tmin else None,
+                        precip_mm=(psum[i] if psum and psum[i] is not None else 0.0),
+                        precip_prob=(pprob[i] if pprob else None),
+                        wind_kmh=(wind[i] if wind else None),
+                        weather_code=(code[i] if code else None),
+                    )
+                )
+            if days:
+                out[name] = days
+        return out
 
 
 def _attach_hourly(days: List[DayForecast], hourly: dict) -> None:

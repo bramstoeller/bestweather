@@ -54,11 +54,12 @@ body {
   border: 1px solid var(--border); background: var(--card); color: var(--text); font-size: 1rem;
 }
 .search input:focus { outline: 2px solid var(--accent-2); border-color: transparent; }
-.loc-btn {
+.star-btn {
   position: absolute; right: 5px; top: 50%; transform: translateY(-50%);
-  width: 36px; height: 36px; border: none; background: transparent; color: var(--text);
-  font-size: 1.15rem; cursor: pointer; border-radius: 9px; display: grid; place-items: center;
+  width: 36px; height: 36px; border: none; background: transparent; color: var(--accent);
+  font-size: 1.3rem; cursor: pointer; border-radius: 9px; display: grid; place-items: center;
 }
+.star-btn[hidden] { display: none; }
 .results button .x { float: right; color: var(--muted); font-weight: 700; }
 
 .results {

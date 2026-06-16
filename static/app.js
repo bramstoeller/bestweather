@@ -139,11 +139,11 @@ function applyLang() {
   $("langBtn").textContent = state.lang === "nl" ? "EN" : "NL";
   $("langBtn").setAttribute("aria-label", t(state.lang, "aria_lang"));
   $("themeBtn").setAttribute("aria-label", t(state.lang, "aria_theme"));
-  $("locBtn").setAttribute("aria-label", t(state.lang, "aria_loc"));
   $("searchInput").placeholder = t(state.lang, "search_placeholder");
   document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(state.lang, el.dataset.i18n); });
   renderProfiles();
   if (state.place) $("searchInput").value = state.place.name;
+  renderStar();
   updateChrome();
   if (state.notFound) renderNotFound();
   else if (state.days.length) renderForecast();
@@ -184,23 +184,18 @@ function toggleFavorite(p) {
   if (list.some((f) => favKey(f) === favKey(p))) list = list.filter((f) => favKey(f) !== favKey(p));
   else list.push({ name: p.name, admin1: p.admin1, country: p.country, lat: p.lat, lon: p.lon });
   saveFavorites(list);
+  renderStar();
   if ($("results").classList.contains("open")) showQuickList();
 }
 function showQuickList() {
   const el = $("results");
-  const p = state.place;
-  let html = "";
-  if (p && !isFavorite(p)) {
-    html += `<button data-savefav>☆ ${escapeHtml(t(state.lang, "save_favorite"))}: ${escapeHtml(p.name)}</button>`;
-  }
+  let html = `<button data-loc>📍 ${escapeHtml(t(state.lang, "aria_loc"))}</button>`;
   html += getFavorites().map((f, i) =>
     `<button data-fav="${i}">★ ${escapeHtml(f.name)}<span class="x" data-favx="${i}">✕</span></button>`
   ).join("");
-  if (!html) { closeResults(); return; }
   el.innerHTML = html;
   el.classList.add("open");
-  const save = el.querySelector("[data-savefav]");
-  if (save) save.addEventListener("click", () => { toggleFavorite(p); });
+  el.querySelector("[data-loc]").addEventListener("click", () => { closeResults(); useMyLocation(); });
   el.querySelectorAll("[data-fav]").forEach((c) => c.addEventListener("click", (e) => {
     if (e.target.dataset.favx != null) return;
     selectPlace(getFavorites()[+c.dataset.fav]);
@@ -245,7 +240,17 @@ function closeResults() { $("results").classList.remove("open"); }
 document.addEventListener("click", (e) => { if (!e.target.closest(".search")) closeResults(); });
 
 // ---------- Geolocation ----------
-$("locBtn").addEventListener("click", useMyLocation);
+$("starBtn").addEventListener("click", () => { if (state.place) toggleFavorite(state.place); });
+function renderStar() {
+  const btn = $("starBtn");
+  if (!state.place) { btn.hidden = true; return; }
+  const fav = isFavorite(state.place);
+  btn.hidden = false;
+  btn.textContent = fav ? "★" : "☆";
+  const lbl = t(state.lang, fav ? "remove_favorite" : "save_favorite");
+  btn.setAttribute("aria-label", lbl);
+  btn.setAttribute("title", lbl);
+}
 function useMyLocation() {
   if (!navigator.geolocation) { setStatusText(t(state.lang, "geo_unavailable")); return; }
   setStatusText(t(state.lang, "locating"));
@@ -326,6 +331,7 @@ function selectPlace(place, push = true) {
   closeResults();
   localStorage.setItem("bw_last", JSON.stringify(place));
   if (push) pushUrl();
+  renderStar();
   updateChrome();
   $("forecast").innerHTML = "";
   subscribe(place);
@@ -336,6 +342,7 @@ function showNotFound(q) {
   state.days = [];
   $("status").innerHTML = "";
   $("sourcesBox").hidden = true;
+  renderStar();
   updateChrome();
   renderNotFound();
 }
@@ -373,7 +380,7 @@ function onMessage(ev) {
     renderScan(); renderSources();
   } else if (msg.type === "update") {
     state.scan.done = msg.done; state.scan.total = msg.total;
-    state.scan.statuses[msg.provider] = msg.status;
+    Object.assign(state.scan.statuses, msg.statuses || {});
     if (msg.changed) updateDays(msg.days);
     renderScan(); renderSources();
     if (msg.changed) renderForecast();
