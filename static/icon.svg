@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="BestWeather">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff8a2b"/>
+      <stop offset="1" stop-color="#ffb347"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="96" fill="#fff"/>
+  <g stroke="#fff" stroke-width="26" stroke-linecap="round">
+    <line x1="256" y1="70"  x2="256" y2="118"/>
+    <line x1="256" y1="394" x2="256" y2="442"/>
+    <line x1="70"  y1="256" x2="118" y2="256"/>
+    <line x1="394" y1="256" x2="442" y2="256"/>
+    <line x1="124" y1="124" x2="158" y2="158"/>
+    <line x1="354" y1="354" x2="388" y2="388"/>
+    <line x1="388" y1="124" x2="354" y2="158"/>
+    <line x1="158" y1="354" x2="124" y2="388"/>
+  </g>
+</svg>

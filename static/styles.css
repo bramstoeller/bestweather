@@ -148,4 +148,19 @@ header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .day .src { font-size: 0.66rem; color: var(--muted); }
 
 .hint { color: var(--muted); text-align: center; padding: 40px 16px; font-size: 0.95rem; }
+
+.about { margin-top: 32px; color: var(--muted); }
+.about h2 { font-size: 1rem; color: var(--text); margin: 18px 0 6px; }
+.about p { font-size: 0.88rem; margin: 0 0 6px; }
+.about details {
+  border-top: 1px solid var(--border); padding: 10px 0; font-size: 0.88rem;
+}
+.about details summary {
+  cursor: pointer; color: var(--text); font-weight: 600; list-style: none;
+}
+.about details summary::-webkit-details-marker { display: none; }
+.about details summary::before { content: "＋ "; color: var(--accent); }
+.about details[open] summary::before { content: "－ "; }
+.about details p { margin: 8px 0 2px; }
+
 .footer { text-align: center; color: var(--muted); font-size: 0.72rem; margin-top: 24px; }

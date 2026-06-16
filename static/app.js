@@ -25,8 +25,15 @@ function toggleTheme() {
 }
 function applyLang() {
   document.documentElement.lang = state.lang;
+  document.title = t(state.lang, "meta_title");
+  const md = document.querySelector('meta[name="description"]');
+  if (md) md.setAttribute("content", t(state.lang, "meta_description"));
   $("langBtn").textContent = state.lang === "nl" ? "EN" : "NL";
+  $("langBtn").setAttribute("aria-label", t(state.lang, "aria_lang"));
+  $("themeBtn").setAttribute("aria-label", t(state.lang, "aria_theme"));
+  $("locBtn").setAttribute("aria-label", t(state.lang, "aria_loc"));
   $("searchInput").placeholder = t(state.lang, "search_placeholder");
+  $("searchInput").setAttribute("aria-label", t(state.lang, "search_placeholder"));
   document.querySelectorAll("[data-i18n]").forEach((el) => {
     el.textContent = t(state.lang, el.dataset.i18n);
   });

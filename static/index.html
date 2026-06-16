@@ -1,12 +1,84 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#ff8a2b" />
-  <title>BestWeather</title>
-  <meta name="description" content="The warmest & driest forecast, from every free weather API." />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☀️</text></svg>" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#ff8a2b" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0f141b" media="(prefers-color-scheme: dark)" />
+
+  <title>BestWeather — het warmste &amp; droogste weer voor jouw locatie</title>
+  <meta name="description" content="Vergelijk live alle gratis weer-API's en zie per dag het warmste en droogste weer voor vandaag en 14 dagen vooruit. Zoek een plaats of gebruik je locatie." />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <link rel="canonical" href="https://mooisteweer.nl/" />
+
+  <!-- Language alternates -->
+  <link rel="alternate" hreflang="nl" href="https://mooisteweer.nl/?lang=nl" />
+  <link rel="alternate" hreflang="en" href="https://mooisteweer.nl/?lang=en" />
+  <link rel="alternate" hreflang="x-default" href="https://mooisteweer.nl/" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="BestWeather" />
+  <meta property="og:title" content="BestWeather — het warmste &amp; droogste weer voor jouw locatie" />
+  <meta property="og:description" content="Vergelijk live alle gratis weer-API's en zie per dag het warmste en droogste weer voor vandaag en 14 dagen vooruit." />
+  <meta property="og:url" content="https://mooisteweer.nl/" />
+  <meta property="og:locale" content="nl_NL" />
+  <meta property="og:locale:alternate" content="en_US" />
+  <meta property="og:image" content="https://mooisteweer.nl/og-image.svg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="BestWeather — het warmste &amp; droogste weer" />
+  <meta name="twitter:description" content="Vergelijk live alle gratis weer-API's en zie het warmste, droogste weer voor 14 dagen." />
+  <meta name="twitter:image" content="https://mooisteweer.nl/og-image.svg" />
+
+  <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/icon.svg" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="BestWeather" />
+
+  <!-- Structured data: the app + FAQ (eligible for rich results) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebApplication",
+        "name": "BestWeather",
+        "url": "https://mooisteweer.nl/",
+        "applicationCategory": "WeatherApplication",
+        "operatingSystem": "Web",
+        "inLanguage": ["nl", "en"],
+        "description": "Vergelijkt live alle gratis weer-API's en toont per dag het warmste en droogste weer voor vandaag en 14 dagen vooruit.",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" }
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Wat betekent 'het beste weer'?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Per dag berekenen we een score op basis van temperatuur, neerslag en regenkans, en kiezen we over alle weerbronnen de warmste en droogste voorspelling." }
+          },
+          {
+            "@type": "Question",
+            "name": "Welke weerbronnen worden gebruikt?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Open-Meteo, MET Norway (yr.no) en Bright Sky (DWD), aangevuld met OpenWeatherMap en WeatherAPI.com wanneer die zijn ingesteld." }
+          },
+          {
+            "@type": "Question",
+            "name": "Is BestWeather gratis?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Ja. BestWeather gebruikt uitsluitend gratis, openbare weer-API's en heeft geen account nodig. Je favorieten blijven privé op je eigen apparaat." }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -14,32 +86,51 @@
     <header>
       <div class="brand">
         <h1>Best<span class="accent">Weather</span></h1>
-        <div class="tagline" data-i18n="tagline"></div>
+        <p class="tagline" data-i18n="tagline">Het warmste &amp; droogste weer, uit elke gratis weer-API.</p>
       </div>
-      <button class="icon-btn" id="langBtn" title="Language">NL</button>
-      <button class="icon-btn" id="themeBtn" title="Theme">🌙</button>
+      <button class="icon-btn" id="langBtn" aria-label="Wissel van taal">NL</button>
+      <button class="icon-btn" id="themeBtn" aria-label="Wissel licht/donker">🌙</button>
     </header>
 
     <div class="search">
       <div class="search-row">
-        <input id="searchInput" type="text" autocomplete="off" />
-        <button class="icon-btn" id="locBtn" title="Use my location">📍</button>
+        <input id="searchInput" type="text" autocomplete="off" aria-label="Zoek een plaats" />
+        <button class="icon-btn" id="locBtn" aria-label="Gebruik mijn locatie">📍</button>
       </div>
-      <div class="results" id="results"></div>
+      <div class="results" id="results" role="listbox"></div>
     </div>
 
     <div class="favorites" id="favorites"></div>
 
     <div class="place-name" id="placeName"></div>
-    <div class="status" id="status"></div>
+    <div class="status" id="status" aria-live="polite"></div>
 
-    <div id="forecast">
-      <div class="hint" id="hint" data-i18n="pick_location"></div>
-    </div>
+    <main id="forecast">
+      <p class="hint" id="hint" data-i18n="pick_location">Zoek een plaats of gebruik je locatie om te starten.</p>
+    </main>
 
-    <div class="footer">
-      BestWeather · mooisteweer.nl · <span id="footerSources"></span>
-    </div>
+    <section class="about">
+      <h2 data-i18n="about_title">Het warmste en droogste weer — uit elke gratis weerbron</h2>
+      <p data-i18n="about_text">BestWeather bevraagt meerdere gratis weerdiensten tegelijk en toont per dag de meest optimistische voorspelling — zo warm en droog mogelijk — voor vandaag en de komende 14 dagen. De voorspelling werkt zich live bij terwijl de bronnen binnenkomen.</p>
+
+      <h2 data-i18n="faq_title">Veelgestelde vragen</h2>
+      <details>
+        <summary data-i18n="faq_q1">Wat betekent 'het beste weer'?</summary>
+        <p data-i18n="faq_a1">Per dag berekenen we een score op basis van temperatuur, neerslag en regenkans, en kiezen we over alle weerbronnen de warmste en droogste voorspelling.</p>
+      </details>
+      <details>
+        <summary data-i18n="faq_q2">Welke weerbronnen worden gebruikt?</summary>
+        <p data-i18n="faq_a2">Open-Meteo, MET Norway (yr.no) en Bright Sky (DWD), aangevuld met OpenWeatherMap en WeatherAPI.com wanneer die zijn ingesteld.</p>
+      </details>
+      <details>
+        <summary data-i18n="faq_q3">Is BestWeather gratis?</summary>
+        <p data-i18n="faq_a3">Ja. BestWeather gebruikt uitsluitend gratis, openbare weer-API's en heeft geen account nodig. Je favorieten blijven privé op je eigen apparaat.</p>
+      </details>
+    </section>
+
+    <footer class="footer">
+      BestWeather · mooisteweer.nl
+    </footer>
   </div>
 
   <script src="/i18n.js"></script>
