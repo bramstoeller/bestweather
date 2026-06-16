@@ -8,8 +8,8 @@
   <rect width="1200" height="630" fill="url(#bg)"/>
   <circle cx="980" cy="200" r="120" fill="#fff" opacity="0.95"/>
   <g font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif" fill="#1c1305">
-    <text x="90" y="300" font-size="96" font-weight="800" letter-spacing="-2">BestWeather</text>
-    <text x="96" y="372" font-size="40" font-weight="600" opacity="0.85">Het warmste &amp; droogste weer voor jouw locatie</text>
+    <text x="90" y="300" font-size="96" font-weight="800" letter-spacing="-2">MooisteWeer</text>
+    <text x="96" y="372" font-size="40" font-weight="600" opacity="0.85">Het mooiste weer voor jouw locatie en activiteit</text>
     <text x="96" y="430" font-size="30" font-weight="500" opacity="0.7">Live uit alle gratis weer-API's · vandaag + 14 dagen</text>
     <text x="96" y="560" font-size="30" font-weight="700">mooisteweer.nl</text>
   </g>

@@ -1,20 +1,21 @@
-"""Normalized data models shared across providers."""
+"""Normalized data shared across providers."""
 
 from dataclasses import asdict, dataclass
-from typing import Optional
+from typing import List, Optional
 
 
 @dataclass
 class DayForecast:
-    """One day of weather, normalized across every provider."""
-
-    date: str  # ISO date, YYYY-MM-DD (local to the queried location)
-    temp_max: float  # degrees Celsius
+    date: str  # ISO date, local to the queried location
+    temp_max: float
     temp_min: Optional[float] = None
     precip_mm: float = 0.0
-    precip_prob: Optional[int] = None  # 0-100, if the provider reports it
-    weather_code: Optional[int] = None  # WMO code, if available
-    source: Optional[str] = None  # provider name that produced this day
+    precip_prob: Optional[int] = None  # 0-100
+    wind_kmh: Optional[float] = None
+    weather_code: Optional[int] = None  # WMO code where available
+    source: Optional[str] = None  # provider that produced this day
+    score: Optional[float] = None  # profile score, set during merge
+    hourly: Optional[List[dict]] = None  # per-hour breakdown, if available
 
     def to_dict(self) -> dict:
         return asdict(self)

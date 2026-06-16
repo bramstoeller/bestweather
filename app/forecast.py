@@ -1,4 +1,4 @@
-"""Orchestrates the live, progressive best-weather search across providers."""
+"""Live, progressive best-weather search across providers."""
 
 import asyncio
 from datetime import date as date_cls
@@ -11,15 +11,12 @@ from .cache import cache
 from .config import settings
 from .models import DayForecast
 from .providers import Provider, active_providers
-from .scoring import merge_best
+from .scoring import Profile, merge_best
 
-# An async callback the websocket layer passes in to push messages to the client.
 Emit = Callable[[dict], Awaitable[None]]
 
 
-async def _cached_fetch(
-    provider: Provider, client: httpx.AsyncClient, lat: float, lon: float
-) -> List[DayForecast]:
+async def _cached_fetch(provider: Provider, client, lat, lon) -> List[DayForecast]:
     key = f"fc:{provider.name}:{round(lat, 2)}:{round(lon, 2)}"
     cached = await cache.get(key)
     if cached is not None:
@@ -29,49 +26,59 @@ async def _cached_fetch(
     return days
 
 
-def _window(best: Dict[str, DayForecast]) -> List[dict]:
-    """Return the best forecast for today .. today+N, sorted, as dicts."""
+def _window(best: Dict[str, DayForecast], hourly_by_date: Dict[str, list]) -> List[dict]:
     today = date_cls.today().isoformat()
     last = (date_cls.today() + timedelta(days=settings.forecast_days - 1)).isoformat()
-    days = [best[d] for d in sorted(best) if today <= d <= last]
-    return [d.to_dict() for d in days[: settings.forecast_days]]
+    chosen = [best[d] for d in sorted(best) if today <= d <= last][: settings.forecast_days]
+    out = []
+    for day in chosen:
+        d = day.to_dict()
+        if not d.get("hourly"):
+            d["hourly"] = hourly_by_date.get(day.date)
+        out.append(d)
+    return out
 
 
-async def run_best_weather(lat: float, lon: float, emit: Emit) -> None:
-    """Query every active provider concurrently and stream improving results.
+async def run_best_weather(lat: float, lon: float, profile: Profile, emit: Emit) -> None:
+    """Query every active provider concurrently, streaming the best so far.
 
-    Emits, in order:
-      - {type: "providers", ...}        once, listing the sources being queried
-      - {type: "update", ...}           per provider as it finishes (ok or error)
-      - {type: "complete", ...}         once, when all providers are done
+    Provider forecasts are scored with the given profile; the best day per date
+    wins. Hourly detail comes from whichever provider supplies it (Open-Meteo)
+    and is attached to every day regardless of which source won the score.
     """
     providers = active_providers()
     await emit(
         {
             "type": "providers",
-            "providers": [p.name for p in providers],
+            "sources": [
+                {"name": p.name, "url": p.url, "keyless": not p.requires_key, "region": p.region}
+                for p in providers
+            ],
             "total": len(providers),
         }
     )
 
     best: Dict[str, DayForecast] = {}
+    hourly_by_date: Dict[str, list] = {}
 
-    async def handle(provider: Provider, client: httpx.AsyncClient):
+    async def handle(provider: Provider, client):
         try:
-            days = await _cached_fetch(provider, client, lat, lon)
-            return provider, days, "ok", None
+            return provider, await _cached_fetch(provider, client, lat, lon), "ok", None
         except Exception as exc:  # noqa: BLE001 - surface any provider failure
             return provider, [], "error", str(exc)
 
-    async with httpx.AsyncClient(
-        timeout=settings.http_timeout, follow_redirects=True
-    ) as client:
+    async with httpx.AsyncClient(timeout=settings.http_timeout, follow_redirects=True) as client:
         tasks = [asyncio.create_task(handle(p, client)) for p in providers]
         done = 0
         for coro in asyncio.as_completed(tasks):
             provider, days, status, error = await coro
             done += 1
-            changed = merge_best(best, days, provider.name) if status == "ok" else False
+            changed = False
+            if status == "ok":
+                for d in days:
+                    if d.hourly and d.date not in hourly_by_date:
+                        hourly_by_date[d.date] = d.hourly
+                changed = merge_best(best, days, provider.name, profile)
             await emit(
                 {
                     "type": "update",
@@ -81,8 +88,8 @@ async def run_best_weather(lat: float, lon: float, emit: Emit) -> None:
                     "done": done,
                     "total": len(providers),
                     "changed": changed,
-                    "days": _window(best),
+                    "days": _window(best, hourly_by_date),
                 }
             )
 
-    await emit({"type": "complete", "total": len(providers), "days": _window(best)})
+    await emit({"type": "complete", "total": len(providers), "days": _window(best, hourly_by_date)})

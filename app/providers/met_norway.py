@@ -1,6 +1,6 @@
-"""MET Norway (yr.no) — free, keyless, global. Hourly data aggregated to days.
+"""MET Norway (yr.no): keyless, global. Hourly series aggregated to days.
 
-MET requires an identifying User-Agent with contact info per their TOS.
+MET requires an identifying User-Agent with contact info per their terms.
 """
 
 from typing import Dict, List
@@ -14,11 +14,11 @@ from .base import Provider
 
 class MetNorway(Provider):
     name = "MET Norway"
+    url = "https://www.yr.no"
+    region = "global"
 
-    async def fetch(
-        self, client: httpx.AsyncClient, lat: float, lon: float
-    ) -> List[DayForecast]:
-        headers = {"User-Agent": f"BestWeather/1.0 ({settings.contact_email})"}
+    async def fetch(self, client, lat, lon) -> List[DayForecast]:
+        headers = {"User-Agent": f"MooisteWeer/1.0 ({settings.contact_email})"}
         params = {"lat": round(lat, 4), "lon": round(lon, 4)}
         resp = await client.get(
             "https://api.met.no/weatherapi/locationforecast/2.0/compact",
@@ -28,12 +28,12 @@ class MetNorway(Provider):
         resp.raise_for_status()
         series = resp.json()["properties"]["timeseries"]
 
-        # Aggregate the hourly time series into per-day min/max/precip.
         days: Dict[str, dict] = {}
         for entry in series:
             date = entry["time"][:10]
             details = entry["data"]["instant"]["details"]
             temp = details.get("air_temperature")
+            wind = details.get("wind_speed")  # m/s
 
             precip = 0.0
             next_1h = entry["data"].get("next_1_hours")
@@ -43,10 +43,12 @@ class MetNorway(Provider):
             elif next_6h:
                 precip = next_6h["details"].get("precipitation_amount", 0.0)
 
-            day = days.setdefault(date, {"tmax": None, "tmin": None, "precip": 0.0})
+            day = days.setdefault(date, {"tmax": None, "tmin": None, "precip": 0.0, "wind": None})
             if temp is not None:
                 day["tmax"] = temp if day["tmax"] is None else max(day["tmax"], temp)
                 day["tmin"] = temp if day["tmin"] is None else min(day["tmin"], temp)
+            if wind is not None:
+                day["wind"] = wind if day["wind"] is None else max(day["wind"], wind)
             day["precip"] += precip
 
         out: List[DayForecast] = []
@@ -60,6 +62,7 @@ class MetNorway(Provider):
                     temp_max=round(v["tmax"], 1),
                     temp_min=round(v["tmin"], 1) if v["tmin"] is not None else None,
                     precip_mm=round(v["precip"], 2),
+                    wind_kmh=round(v["wind"] * 3.6, 1) if v["wind"] is not None else None,
                 )
             )
         return out

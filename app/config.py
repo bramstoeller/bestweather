@@ -1,4 +1,4 @@
-"""Application configuration, loaded from environment / .env file."""
+"""Configuration from environment / .env."""
 
 import os
 from dataclasses import dataclass
@@ -16,11 +16,13 @@ def _get(name: str, default: str = "") -> str:
 class Settings:
     openweathermap_key: str = _get("OPENWEATHERMAP_API_KEY")
     weatherapi_key: str = _get("WEATHERAPI_API_KEY")
+    tomorrow_key: str = _get("TOMORROW_API_KEY")
+    visualcrossing_key: str = _get("VISUALCROSSING_API_KEY")
+    weerlive_key: str = _get("WEERLIVE_API_KEY")
     contact_email: str = _get("CONTACT_EMAIL", "info@mooisteweer.nl")
     cache_ttl_seconds: int = int(_get("CACHE_TTL_SECONDS", "1800"))
     geocode_cache_ttl_seconds: int = int(_get("GEOCODE_CACHE_TTL_SECONDS", "86400"))
     http_timeout: float = float(_get("HTTP_TIMEOUT", "12"))
-    # How many days of forecast to show (today + N-1 ahead).
     forecast_days: int = 15
 
 

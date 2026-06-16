@@ -1,7 +1,7 @@
 {
-  "name": "BestWeather",
-  "short_name": "BestWeather",
-  "description": "Het warmste en droogste weer voor jouw locatie, uit alle gratis weer-API's.",
+  "name": "MooisteWeer",
+  "short_name": "MooisteWeer",
+  "description": "Het weer dat het best past bij jouw activiteit, uit alle gratis weer-API's.",
   "lang": "nl",
   "start_url": "/",
   "scope": "/",

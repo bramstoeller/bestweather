@@ -1,4 +1,4 @@
-"""Location search (forward) and reverse geocoding, using free keyless APIs."""
+"""Place search (forward) and reverse geocoding, using free keyless APIs."""
 
 from typing import List, Optional
 
@@ -14,7 +14,7 @@ async def search(query: str, lang: str = "en", limit: int = 8) -> List[dict]:
     if not query:
         return []
 
-    key = f"geo-search:{lang}:{query.lower()}"
+    key = f"geo-search:{lang}:{query.lower()}:{limit}"
     cached = await cache.get(key)
     if cached is not None:
         return cached
@@ -29,33 +29,24 @@ async def search(query: str, lang: str = "en", limit: int = 8) -> List[dict]:
         resp.raise_for_status()
         results = resp.json().get("results", []) or []
 
-    out = [
-        {
-            "name": r["name"],
-            "admin1": r.get("admin1"),
-            "country": r.get("country"),
-            "country_code": r.get("country_code"),
-            "lat": r["latitude"],
-            "lon": r["longitude"],
-        }
-        for r in results
-    ]
+    out = [_place(r) for r in results]
     await cache.set(key, out, settings.geocode_cache_ttl_seconds)
     return out
 
 
 async def reverse(lat: float, lon: float, lang: str = "en") -> Optional[dict]:
-    """Resolve coordinates to a place name via BigDataCloud's keyless API."""
+    """Resolve coordinates to a place.
+
+    BigDataCloud turns coordinates into a locality name; that name is then run
+    back through the search API so the result is named exactly like search
+    results (canonical country/region names), without per-name special-casing.
+    """
     key = f"geo-reverse:{lang}:{round(lat, 3)}:{round(lon, 3)}"
     cached = await cache.get(key)
     if cached is not None:
         return cached
 
-    params = {
-        "latitude": lat,
-        "longitude": lon,
-        "localityLanguage": lang,
-    }
+    params = {"latitude": lat, "longitude": lon, "localityLanguage": lang}
     async with httpx.AsyncClient(
         timeout=settings.http_timeout, follow_redirects=True
     ) as client:
@@ -66,13 +57,40 @@ async def reverse(lat: float, lon: float, lang: str = "en") -> Optional[dict]:
         data = resp.json()
 
     name = data.get("city") or data.get("locality") or data.get("principalSubdivision")
-    out = {
-        "name": name or "Current location",
-        "admin1": data.get("principalSubdivision"),
-        "country": data.get("countryName"),
-        "country_code": data.get("countryCode"),
-        "lat": lat,
-        "lon": lon,
+    place = None
+    if name:
+        candidates = await search(name, lang, limit=10)
+        place = _nearest(candidates, lat, lon)
+    if place is None:
+        place = {
+            "name": name or "?",
+            "admin1": data.get("principalSubdivision"),
+            "country": data.get("countryName"),
+            "country_code": data.get("countryCode"),
+            "lat": lat,
+            "lon": lon,
+        }
+
+    await cache.set(key, place, settings.geocode_cache_ttl_seconds)
+    return place
+
+
+def _place(r: dict) -> dict:
+    return {
+        "name": r["name"],
+        "admin1": r.get("admin1"),
+        "country": r.get("country"),
+        "country_code": r.get("country_code"),
+        "lat": r["latitude"],
+        "lon": r["longitude"],
     }
-    await cache.set(key, out, settings.geocode_cache_ttl_seconds)
-    return out
+
+
+def _nearest(candidates: List[dict], lat: float, lon: float, max_deg: float = 0.75):
+    """Closest candidate to the coordinates, or None if all are far away."""
+    best, best_d = None, max_deg ** 2
+    for c in candidates:
+        d = (c["lat"] - lat) ** 2 + (c["lon"] - lon) ** 2
+        if d < best_d:
+            best, best_d = c, d
+    return best
