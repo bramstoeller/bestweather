@@ -451,32 +451,47 @@ function hoursHtml(d, isToday) {
   return `<div class="hours">${cells}</div>`;
 }
 
-function dayCard(d, isToday) {
-  const expanded = state.expanded.has(d.date);
-  const changed = state.changedDates.has(d.date) ? " changed" : "";
-  const label = isToday
-    ? `<div class="dow">${escapeHtml(t(state.lang, "today"))}</div>`
-    : `<div class="dow">${fmtDow(d.date)}</div><div class="date">${fmtDate(d.date)}</div>`;
-  const src = expanded && d.source
+function srcLink(d, expanded) {
+  return expanded && d.source
     ? `<a class="src" href="${escapeAttr(sourceLinkFor(d.source))}" target="_blank" rel="noopener">${escapeHtml(d.source)}</a>`
     : "";
+}
+function dayCard(d) {
+  const expanded = state.expanded.has(d.date);
+  const changed = state.changedDates.has(d.date) ? " changed" : "";
   return `
-    <div class="day${isToday ? " today" : ""}${changed}" data-day="${d.date}">
+    <div class="day${changed}" data-day="${d.date}">
       <div class="day-row">
-        <div>${label}</div>
+        <div><div class="dow">${fmtDow(d.date)}</div><div class="date">${fmtDate(d.date)}</div></div>
         <div class="emoji">${emojiFor(d.weather_code, d.precip_mm, d.temp_max)}</div>
-        <div class="mid"><div class="meta">${escapeHtml(metaLine(d))}</div>${src}</div>
+        <div class="mid"><div class="meta">${escapeHtml(metaLine(d))}</div>${srcLink(d, expanded)}</div>
         <div class="temps"><span class="tmax">${r0(d.temp_max)}°</span>${d.temp_min != null ? `<span class="tmin"> / ${r0(d.temp_min)}°</span>` : ""}</div>
       </div>
-      ${expanded ? hoursHtml(d, isToday) : ""}
+      ${expanded ? hoursHtml(d, false) : ""}
+    </div>`;
+}
+function todayCard(d) {
+  const expanded = state.expanded.has(d.date);
+  const changed = state.changedDates.has(d.date) ? " changed" : "";
+  const src = expanded && d.source ? `<div class="today-src">${srcLink(d, true)}</div>` : "";
+  return `
+    <div class="today-card${changed}" data-day="${d.date}">
+      <div class="today-top">
+        <div>
+          <div class="today-label">${escapeHtml(t(state.lang, "today"))}</div>
+          <div class="today-temp">${r0(d.temp_max)}°<small>${d.temp_min != null ? " / " + r0(d.temp_min) + "°" : ""}</small></div>
+          <div class="today-meta">${escapeHtml(metaLine(d))}</div>
+        </div>
+        <div class="today-emoji">${emojiFor(d.weather_code, d.precip_mm, d.temp_max)}</div>
+      </div>
+      ${expanded ? src + hoursHtml(d, true) : ""}
     </div>`;
 }
 
 function renderForecast() {
   if (!state.days.length) return;
   const [today, ...rest] = state.days;
-  const html = dayCard(today, true) + rest.map((d) => dayCard(d, false)).join("");
-  $("forecast").innerHTML = `<div class="grid">${html}</div>`;
+  $("forecast").innerHTML = todayCard(today) + `<div class="grid">${rest.map(dayCard).join("")}</div>`;
   $("forecast").querySelectorAll("[data-day]").forEach((el) =>
     el.addEventListener("click", () => toggleDay(el.dataset.day)));
   // Source links shouldn't also toggle the day's hours.

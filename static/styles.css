@@ -104,8 +104,21 @@ body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.day.today { border-color: var(--accent); }
-.day.today .dow { color: var(--accent); }
+.today-card {
+  background: linear-gradient(135deg, #222c3b, #161d27);
+  color: #eef3f8; border: 1px solid #2b3645; border-radius: var(--radius);
+  padding: 18px; box-shadow: var(--shadow); margin-bottom: 12px; cursor: pointer;
+}
+.today-top { display: flex; justify-content: space-between; align-items: flex-start; }
+.today-label { font-weight: 700; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.08em; color: var(--accent); }
+.today-temp { font-size: 3.2rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; }
+.today-temp small { font-size: 1.1rem; font-weight: 600; opacity: 0.6; }
+.today-emoji { font-size: 3rem; line-height: 1; }
+.today-meta { font-size: 0.9rem; opacity: 0.85; margin-top: 4px; }
+.today-src { font-size: 0.72rem; margin-top: 8px; }
+.today-card .src { color: var(--accent-2); }
+.today-card .hours { border-top-color: rgba(255, 255, 255, 0.14); scrollbar-color: rgba(255, 255, 255, 0.3) transparent; }
+.today-card .hours::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.25); }
 
 .grid { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
 .day {
