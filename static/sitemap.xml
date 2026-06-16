@@ -2,10 +2,10 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://mooisteweer.nl/</loc>
-    <xhtml:link rel="alternate" hreflang="nl" href="https://mooisteweer.nl/?lang=nl" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://mooisteweer.nl/?lang=en" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://mooisteweer.nl/" />
+    <loc>https://altijdmooiweer.nl/</loc>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://altijdmooiweer.nl/?lang=nl" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://altijdmooiweer.nl/?lang=en" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://altijdmooiweer.nl/" />
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>

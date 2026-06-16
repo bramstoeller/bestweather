@@ -1,5 +1,5 @@
 // Translations. Code and keys in English; Dutch provided. The brand is
-// "MooisteWeer" in Dutch and "BestWeather" in English.
+// "AltijdMooiWeer" in Dutch and "BestWeather" in English.
 const I18N = {
   en: {
     tagline: "Weather sites rarely agree. We gather them and show you the brightest forecast.",
@@ -80,7 +80,7 @@ const I18N = {
     source: "Beste bron",
     dry: "droog",
     wind: "wind",
-    meta_title: "MooisteWeer - het warmste en droogste weer voor jouw locatie",
+    meta_title: "AltijdMooiWeer - het warmste en droogste weer voor jouw locatie",
     meta_description: "Vergelijk live alle gratis weer-API's en zie per dag het warmste en droogste weer voor vandaag en 14 dagen vooruit. Zoek een plaats of gebruik je locatie.",
     aria_lang: "Wissel van taal",
     aria_theme: "Wissel licht/donker",

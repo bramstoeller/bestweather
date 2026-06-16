@@ -1,4 +1,4 @@
-# Deploying MooisteWeer
+# Deploying AltijdMooiWeer
 
 The app is a git checkout on the server. The nginx vhost and the systemd unit
 are **symlinks into this checkout**, so a deploy is just `git pull` + restart.
@@ -8,7 +8,7 @@ lives in `/var/www/<domain>` and runs as a systemd service on `127.0.0.1:8800`.
 
 ```bash
 HOST=user@your-server
-APPDIR=/var/www/mooisteweer.nl
+APPDIR=/var/www/altijdmooiweer.nl
 REPO=https://github.com/<owner>/<repo>.git
 ```
 
@@ -54,7 +54,7 @@ ssh "$HOST" "bash -lc '
   printf \"[Service]\nUser=$DEPLOY_USER\nGroup=$DEPLOY_USER\n\" | sudo tee /etc/systemd/system/bestweather.service.d/override.conf
   sudo systemctl daemon-reload && sudo systemctl enable --now bestweather
 
-  sudo ln -sfn $APPDIR/deploy/nginx-https.conf /etc/nginx/conf.d/mooisteweer.nl.conf
+  sudo ln -sfn $APPDIR/deploy/nginx-https.conf /etc/nginx/conf.d/altijdmooiweer.nl.conf
   cat $APPDIR/ssl/certificate.crt $APPDIR/ssl/cabundle.crt > $APPDIR/ssl/fullchain.crt
   sudo nginx -t && sudo systemctl reload nginx
 '"

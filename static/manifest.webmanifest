@@ -1,6 +1,6 @@
 {
-  "name": "MooisteWeer",
-  "short_name": "MooisteWeer",
+  "name": "AltijdMooiWeer",
+  "short_name": "AltijdMooiWeer",
   "description": "Het weer dat het best past bij jouw activiteit, uit alle gratis weer-API's.",
   "lang": "nl",
   "start_url": "/",

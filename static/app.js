@@ -1,4 +1,4 @@
-// MooisteWeer frontend: geolocation, search, favorites, weather profiles,
+// AltijdMooiWeer frontend: geolocation, search, favorites, weather profiles,
 // per-place URLs, hourly detail, and the live websocket that streams the best
 // forecast as each server-side source returns.
 
@@ -135,7 +135,7 @@ function toggleTheme() {
   applyTheme();
 }
 function brandHtml() {
-  return state.lang === "nl" ? 'Mooiste<span class="accent">Weer</span>' : 'Best<span class="accent">Weather</span>';
+  return state.lang === "nl" ? 'AltijdMooi<span class="accent">Weer</span>' : 'Best<span class="accent">Weather</span>';
 }
 function applyLang() {
   document.documentElement.lang = state.lang;
