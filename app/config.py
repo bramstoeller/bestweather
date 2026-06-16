@@ -19,7 +19,7 @@ class Settings:
     tomorrow_key: str = _get("TOMORROW_API_KEY")
     visualcrossing_key: str = _get("VISUALCROSSING_API_KEY")
     weerlive_key: str = _get("WEERLIVE_API_KEY")
-    contact_email: str = _get("CONTACT_EMAIL", "contact@example.com")
+    contact_email: str = _get("CONTACT_EMAIL")
     cache_ttl_seconds: int = int(_get("CACHE_TTL_SECONDS", "1800"))
     geocode_cache_ttl_seconds: int = int(_get("GEOCODE_CACHE_TTL_SECONDS", "86400"))
     http_timeout: float = float(_get("HTTP_TIMEOUT", "12"))

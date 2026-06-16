@@ -63,7 +63,7 @@ const I18N = {
     months: ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
   },
   nl: {
-    tagline: "Weersites zijn het zelden eens. Wij verzamelen ze en tonen je de mooiste voorspelling.",
+    tagline: "Weersites zijn het zelden eens. Wij verzamelen ze en tonen je het mooiste weer.",
     search_placeholder: "Zoek een stad of plaats…",
     favorites: "Favorieten",
     today: "Vandaag",

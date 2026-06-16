@@ -18,7 +18,8 @@ class MetNorway(Provider):
     region = "global"
 
     async def fetch(self, client, lat, lon) -> List[DayForecast]:
-        headers = {"User-Agent": f"MooisteWeer/1.0 ({settings.contact_email})"}
+        contact = settings.contact_email or "+https://mooisteweer.nl"
+        headers = {"User-Agent": f"MooisteWeer/1.0 ({contact})"}
         params = {"lat": round(lat, 4), "lon": round(lon, 4)}
         resp = await client.get(
             "https://api.met.no/weatherapi/locationforecast/2.0/compact",

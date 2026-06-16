@@ -1,84 +1,73 @@
-# Deploying BestWeather to mooisteweer.nl
+# Deploying MooisteWeer
 
-Target: `user@your-server` (Fedora 43, nginx, Python 3.14, passwordless
-sudo). Follows the house style of `ehbo.app` on the same host: code in
-`/var/www/<domain>`, the vhost lives in the repo and is symlinked into
-`/etc/nginx/conf.d/`, the app runs as a systemd service on `127.0.0.1:8800`.
+The host runs nginx with Python 3.14 and passwordless sudo. The app lives in
+`/var/www/<domain>`, its vhost lives in this repo and is symlinked into
+`/etc/nginx/conf.d/`, and it runs as a systemd service on `127.0.0.1:8800`.
 
-> Shared host — other vhosts (ehbo.app) run here. Every step is additive and the
-> nginx change is staged so `nginx -t` can never fail on a missing TLS cert.
-
-## 1. Code + venv (`/var/www/mooisteweer.nl`)
+Set your own target first; nothing about the server is hard-coded in the repo:
 
 ```bash
-rsync -az --delete --exclude .venv --exclude .git --exclude __pycache__ --exclude .env \
-  ./ user@your-server:/var/www/mooisteweer.nl/
-ssh user@your-server 'bash -lc "
-  cd /var/www/mooisteweer.nl
+HOST=user@your-server           # ssh target
+APPDIR=/var/www/mooisteweer.nl  # app directory on the server
+```
+
+> Shared host: other vhosts may run here. Every step is additive and the nginx
+> change is staged so `nginx -t` can never fail on a missing TLS cert.
+
+## 1. Code + venv
+
+```bash
+rsync -az --delete --exclude .venv --exclude .git --exclude __pycache__ --exclude .env --exclude ssl \
+  ./ "$HOST:$APPDIR/"
+ssh "$HOST" "bash -lc '
+  cd $APPDIR
   python3 -m venv .venv
   .venv/bin/python -m pip install --upgrade pip
   .venv/bin/pip install -r deploy/requirements-server.txt
-  [ -f .env ] || install -m 600 .env.example .env   # add API keys here (kept out of git)
+  [ -f .env ] || install -m 600 .env.example .env   # add API keys + CONTACT_EMAIL here
   mkdir -p certbot ssl
-"'
+'"
+```
+
+On SELinux hosts the venv binaries must be executable by systemd, and the app
+port must be labelled as an http port:
+
+```bash
+ssh "$HOST" 'sudo semanage fcontext -a -t bin_t "'"$APPDIR"'/.venv/bin(/.*)?" && sudo restorecon -RvF '"$APPDIR"'/.venv/bin'
+ssh "$HOST" 'sudo semanage port -a -t http_port_t -p tcp 8800 || true'
 ```
 
 ## 2. systemd service (localhost:8800)
 
 ```bash
-ssh user@your-server 'bash -lc "
-  sudo cp /var/www/mooisteweer.nl/deploy/bestweather.service /etc/systemd/system/bestweather.service
-  sudo systemctl daemon-reload
-  sudo systemctl enable --now bestweather
+ssh "$HOST" "bash -lc '
+  sudo cp $APPDIR/deploy/bestweather.service /etc/systemd/system/bestweather.service
+  sudo systemctl daemon-reload && sudo systemctl enable --now bestweather
   sleep 2 && curl -fsS http://127.0.0.1:8800/api/health
-"'
+'"
 ```
 
-## 3. nginx vhost — HTTP stage (safe before certs)
+## 3. nginx vhost
+
+HTTP first (safe before certs), then HTTPS once the cert files are in `ssl/`
+(`certificate.crt`, `certificate.key`, `cabundle.crt`):
 
 ```bash
-ssh user@your-server 'bash -lc "
-  sudo ln -sfn /var/www/mooisteweer.nl/deploy/nginx.conf /etc/nginx/conf.d/mooisteweer.nl.conf
+# HTTP stage
+ssh "$HOST" "sudo ln -sfn $APPDIR/deploy/nginx.conf /etc/nginx/conf.d/mooisteweer.nl.conf && sudo nginx -t && sudo systemctl reload nginx"
+
+# HTTPS stage: build the full chain, then switch the vhost
+ssh "$HOST" "bash -lc '
+  cat $APPDIR/ssl/certificate.crt $APPDIR/ssl/cabundle.crt > $APPDIR/ssl/fullchain.crt
+  sudo ln -sfn $APPDIR/deploy/nginx-https.conf /etc/nginx/conf.d/mooisteweer.nl.conf
   sudo nginx -t && sudo systemctl reload nginx
-  curl -fsS http://mooisteweer.nl/api/health
-"'
+'"
 ```
-
-The site is now live over HTTP at http://mooisteweer.nl.
-
-## 4. HTTPS stage (after the cert files land in `ssl/`)
-
-Drop `certificate.crt`, `certificate.key`, `cabundle.crt` into
-`/var/www/mooisteweer.nl/ssl/`, then switch the vhost to the HTTPS version:
-
-```bash
-ssh user@your-server 'bash -lc "
-  cp /var/www/mooisteweer.nl/deploy/nginx-https.conf /var/www/mooisteweer.nl/deploy/nginx.conf
-  sudo nginx -t && sudo systemctl reload nginx
-"'
-```
-
-(`nginx.conf` is the symlinked file; overwriting it with the HTTPS variant and
-reloading is the whole switch. `git checkout deploy/nginx.conf` to undo locally.)
-
-Geolocation ("use my location") only works over HTTPS, so finish this step
-before relying on it.
 
 ## Update later
 
 ```bash
-rsync -az --delete --exclude .venv --exclude .git --exclude __pycache__ --exclude .env \
-  ./ user@your-server:/var/www/mooisteweer.nl/
-ssh user@your-server 'cd /var/www/mooisteweer.nl && .venv/bin/pip install -r deploy/requirements-server.txt && sudo systemctl restart bestweather'
-```
-
-## Rollback (clean)
-
-```bash
-ssh user@your-server 'bash -lc "
-  sudo rm -f /etc/nginx/conf.d/mooisteweer.nl.conf && sudo nginx -t && sudo systemctl reload nginx
-  sudo systemctl disable --now bestweather
-  sudo rm -f /etc/systemd/system/bestweather.service && sudo systemctl daemon-reload
-  rm -rf /var/www/mooisteweer.nl
-"'
+rsync -az --exclude .venv --exclude .git --exclude __pycache__ --exclude .env --exclude ssl \
+  ./ "$HOST:$APPDIR/"
+ssh "$HOST" "cd $APPDIR && .venv/bin/pip install -r deploy/requirements-server.txt && sudo systemctl restart bestweather"
 ```

@@ -250,7 +250,9 @@ function pushUrl() {
   if (!state.place) return;
   const segs = [state.place.country, state.place.admin1, state.place.name]
     .filter(Boolean).map(encodeURIComponent);
-  const url = "/" + segs.join("/") + "/" + activityFor(state.profileKey);
+  // No profile chosen means "general", so we leave the activity off the URL.
+  let url = "/" + segs.join("/");
+  if (state.profileKey !== "general") url += "/" + activityFor(state.profileKey);
   if (location.pathname !== url) history.pushState({}, "", url);
 }
 function parseUrl() {
