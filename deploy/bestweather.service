@@ -1,0 +1,32 @@
+# systemd unit for BestWeather.
+# Install to /etc/systemd/system/bestweather.service
+#
+# Isolated by design: binds ONLY to 127.0.0.1 on a high port, so it cannot
+# clash with whatever else already serves :80/:443 on this host. A reverse
+# proxy (see deploy/nginx-mooisteweer.conf) exposes it on mooisteweer.nl.
+#
+# Adjust User/Group and the two paths to match where you cloned the repo.
+
+[Unit]
+Description=BestWeather (mooisteweer.nl)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/bestweather
+EnvironmentFile=-/opt/bestweather/.env
+ExecStart=/opt/bestweather/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8800 --workers 1
+Restart=on-failure
+RestartSec=3
+
+# Light hardening — safe defaults that don't affect other services.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
