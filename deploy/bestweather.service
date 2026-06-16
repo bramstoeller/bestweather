@@ -1,12 +1,12 @@
 # systemd unit for BestWeather on the mooisteweer.nl server.
-# Install to /etc/systemd/system/bestweather.service (needs sudo).
+# Install to /etc/systemd/system/bestweather.service.
 #
-# Isolated by design: binds ONLY to 127.0.0.1:8800, so it cannot clash with
-# Apache on :80/:443 or any other service. Apache reverse-proxies it for the
-# mooisteweer.nl vhost (see apache-mooisteweer.conf).
+# Isolated by design: binds ONLY to 127.0.0.1:8800; nginx reverse-proxies it for
+# the mooisteweer.nl vhost. Runs as the deploy user, matching the house style of
+# gunicorn-ehbo.service on this host.
 
 [Unit]
-Description=BestWeather (mooisteweer.nl)
+Description=BestWeather (mooisteweer.nl) ASGI service
 After=network-online.target
 Wants=network-online.target
 
@@ -14,14 +14,13 @@ Wants=network-online.target
 Type=simple
 User=deploy
 Group=deploy
-WorkingDirectory=/home/deploy/bestweather
-EnvironmentFile=-/home/deploy/bestweather/.env
-ExecStart=/home/deploy/bestweather/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8800 --workers 1
+WorkingDirectory=/var/www/mooisteweer.nl
+EnvironmentFile=-/var/www/mooisteweer.nl/.env
+ExecStart=/var/www/mooisteweer.nl/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8800 --workers 1
 Restart=on-failure
 RestartSec=3
 
 NoNewPrivileges=true
-PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target

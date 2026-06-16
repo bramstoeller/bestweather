@@ -1,0 +1,10 @@
+# Server deps for mooisteweer.nl (Fedora 43, Python 3.14).
+# Unpinned so pip resolves the newest releases that ship cp314 wheels.
+# No uvicorn[standard] extras (uvloop/httptools lag behind new CPython);
+# the `websockets` lib is all uvicorn needs for the /ws endpoint.
+# A frozen lockfile (requirements-server.lock.txt) is generated after install.
+fastapi
+uvicorn
+websockets
+httpx
+python-dotenv

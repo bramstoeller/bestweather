@@ -1,76 +1,84 @@
 # Deploying BestWeather to mooisteweer.nl
 
-> ⚠️ **Live, shared Apache server** (`vps1541`, Ubuntu 18.04) hosting ~20 other
-> vhosts. Everything below is additive and scoped to BestWeather only: a service
-> bound to **127.0.0.1:8800** and one new Apache vhost for `mooisteweer.nl`.
-> No existing site, module behaviour, or port binding of other apps is changed.
+Target: `user@your-server` (Fedora 43, nginx, Python 3.14, passwordless
+sudo). Follows the house style of `ehbo.app` on the same host: code in
+`/var/www/<domain>`, the vhost lives in the repo and is symlinked into
+`/etc/nginx/conf.d/`, the app runs as a systemd service on `127.0.0.1:8800`.
 
-## What runs where
+> Shared host — other vhosts (ehbo.app) run here. Every step is additive and the
+> nginx change is staged so `nginx -t` can never fail on a missing TLS cert.
 
-- **App**: `~/bestweather` (no root needed), Python 3.8 venv, uvicorn on
-  `127.0.0.1:8800`.
-- **Public**: Apache reverse-proxies `mooisteweer.nl` → `127.0.0.1:8800`,
-  tunnelling the `/ws` websocket via `mod_proxy_wstunnel`.
-
-## 1. Deploy the code (no sudo)
-
-From your laptop:
+## 1. Code + venv (`/var/www/mooisteweer.nl`)
 
 ```bash
-rsync -az --delete \
-  --exclude .venv --exclude .git --exclude __pycache__ --exclude .env \
-  ./ user@your-server:~/bestweather/
+rsync -az --delete --exclude .venv --exclude .git --exclude __pycache__ --exclude .env \
+  ./ user@your-server:/var/www/mooisteweer.nl/
+ssh user@your-server 'bash -lc "
+  cd /var/www/mooisteweer.nl
+  python3 -m venv .venv
+  .venv/bin/python -m pip install --upgrade pip
+  .venv/bin/pip install -r deploy/requirements-server.txt
+  [ -f .env ] || install -m 600 .env.example .env   # add API keys here (kept out of git)
+  mkdir -p certbot ssl
+"'
 ```
 
-On the server:
+## 2. systemd service (localhost:8800)
 
 ```bash
-cd ~/bestweather
-python3.8 -m venv .venv
-.venv/bin/python -m pip install --upgrade pip
-.venv/bin/pip install -r deploy/requirements-py38.txt
-cp .env.example .env        # optional: add OPENWEATHERMAP_API_KEY / WEATHERAPI_API_KEY
-# Smoke test (Ctrl-C after the health check):
-.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8800 &
-sleep 2 && curl -s http://127.0.0.1:8800/api/health && kill %1
+ssh user@your-server 'bash -lc "
+  sudo cp /var/www/mooisteweer.nl/deploy/bestweather.service /etc/systemd/system/bestweather.service
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now bestweather
+  sleep 2 && curl -fsS http://127.0.0.1:8800/api/health
+"'
 ```
 
-## 2. Privileged setup (needs sudo)
-
-Modules + service + vhost, all in one guarded script that aborts on any Apache
-config error and reloads (never restarts) Apache:
+## 3. nginx vhost — HTTP stage (safe before certs)
 
 ```bash
-sudo bash ~/bestweather/deploy/server-setup-root.sh
+ssh user@your-server 'bash -lc "
+  sudo ln -sfn /var/www/mooisteweer.nl/deploy/nginx.conf /etc/nginx/conf.d/mooisteweer.nl.conf
+  sudo nginx -t && sudo systemctl reload nginx
+  curl -fsS http://mooisteweer.nl/api/health
+"'
 ```
 
-This: enables `proxy proxy_http proxy_wstunnel`, installs+starts the
-`bestweather` systemd service, installs the vhost, runs `apache2ctl configtest`,
-then `systemctl reload apache2`.
+The site is now live over HTTP at http://mooisteweer.nl.
 
-## 3. HTTPS (after DNS points here)
+## 4. HTTPS stage (after the cert files land in `ssl/`)
 
-Geolocation needs HTTPS. Once `mooisteweer.nl` resolves to `your-server`:
+Drop `certificate.crt`, `certificate.key`, `cabundle.crt` into
+`/var/www/mooisteweer.nl/ssl/`, then switch the vhost to the HTTPS version:
 
 ```bash
-sudo apt-get install -y certbot python3-certbot-apache
-sudo certbot --apache -d mooisteweer.nl -d www.mooisteweer.nl
+ssh user@your-server 'bash -lc "
+  cp /var/www/mooisteweer.nl/deploy/nginx-https.conf /var/www/mooisteweer.nl/deploy/nginx.conf
+  sudo nginx -t && sudo systemctl reload nginx
+"'
 ```
+
+(`nginx.conf` is the symlinked file; overwriting it with the HTTPS variant and
+reloading is the whole switch. `git checkout deploy/nginx.conf` to undo locally.)
+
+Geolocation ("use my location") only works over HTTPS, so finish this step
+before relying on it.
 
 ## Update later
 
 ```bash
 rsync -az --delete --exclude .venv --exclude .git --exclude __pycache__ --exclude .env \
-  ./ user@your-server:~/bestweather/
-ssh user@your-server 'cd ~/bestweather && .venv/bin/pip install -r deploy/requirements-py38.txt && sudo systemctl restart bestweather'
+  ./ user@your-server:/var/www/mooisteweer.nl/
+ssh user@your-server 'cd /var/www/mooisteweer.nl && .venv/bin/pip install -r deploy/requirements-server.txt && sudo systemctl restart bestweather'
 ```
 
-## Rollback (clean removal)
+## Rollback (clean)
 
 ```bash
-sudo a2dissite mooisteweer_nl && sudo systemctl reload apache2
-sudo systemctl disable --now bestweather
-sudo rm /etc/systemd/system/bestweather.service && sudo systemctl daemon-reload
-sudo rm /etc/apache2/sites-available/mooisteweer_nl.conf
-# (proxy modules can stay enabled; harmless. ~/bestweather can be deleted.)
+ssh user@your-server 'bash -lc "
+  sudo rm -f /etc/nginx/conf.d/mooisteweer.nl.conf && sudo nginx -t && sudo systemctl reload nginx
+  sudo systemctl disable --now bestweather
+  sudo rm -f /etc/systemd/system/bestweather.service && sudo systemctl daemon-reload
+  rm -rf /var/www/mooisteweer.nl
+"'
 ```
