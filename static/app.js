@@ -470,7 +470,7 @@ function openProfileModal() {
     const p = o[k] || PROFILE_DEFAULTS[k];
     return `<div class="prow" data-builtin="${k}">
       <div class="pname">${PROFILE_ICON[k]} ${escapeHtml(t(state.lang, "profile_" + k))}</div>
-      <button class="linkbtn" data-reset="${k}">${escapeHtml(t(state.lang, "reset_default"))}</button>
+      <button class="linkbtn reset" data-reset="${k}" title="${escapeAttr(t(state.lang, "reset_default"))}" aria-label="${escapeAttr(t(state.lang, "reset_default"))}">↺</button>
       ${fieldsHtml(p)}
     </div>`;
   }).join("");
