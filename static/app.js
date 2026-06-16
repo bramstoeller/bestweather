@@ -43,8 +43,8 @@ const $ = (id) => document.getElementById(id);
 // ---------- Profiles ----------
 function getOverrides() { try { return JSON.parse(localStorage.getItem("mw_overrides") || "{}"); } catch { return {}; } }
 function setOverrides(o) { localStorage.setItem("mw_overrides", JSON.stringify(o)); }
-function getCustoms() { try { return JSON.parse(localStorage.getItem("mw_customs") || "[]"); } catch { return []; } }
-function setCustoms(list) { localStorage.setItem("mw_customs", JSON.stringify(list)); }
+function getCustom() { try { return JSON.parse(localStorage.getItem("mw_custom") || "null"); } catch { return null; } }
+function setCustom(obj) { if (obj) localStorage.setItem("mw_custom", JSON.stringify(obj)); else localStorage.removeItem("mw_custom"); }
 
 function num(x) { return Number.isInteger(x) ? x : Math.round(x * 10) / 10; }
 function customCode(p) { return `t${num(p.temp)}p${num(p.precip)}w${num(p.wind)}`; }
@@ -62,8 +62,8 @@ function wsProfile(pk) { return customCode(pointFor(pk)); }
 function profileIcon(pk) { return isCustomKey(pk) ? "✨" : (PROFILE_ICON[pk] || "✨"); }
 function profileLabel(pk) {
   if (isCustomKey(pk)) {
-    const c = getCustoms().find((c) => customCode(c) === pk);
-    return c ? c.name : t(state.lang, "customize");
+    const c = getCustom();
+    return c && customCode(c) === pk ? c.name : t(state.lang, "customize");
   }
   return t(state.lang, "profile_" + pk);
 }
@@ -94,14 +94,14 @@ function profileRelevant(key) {
 function renderProfiles() {
   const el = $("profiles");
   const builtins = PROFILE_ORDER.filter((k) => k === "general" || k === state.profileKey || profileRelevant(k));
-  const keys = [...builtins, ...getCustoms().map(customCode)];
+  const custom = getCustom();
+  const keys = [...builtins, ...(custom ? [customCode(custom)] : [])];
   let html = keys.map((pk) => {
     const active = pk === state.profileKey;
-    const label = active ? ` ${escapeHtml(profileLabel(pk))}` : "";
     const tip = `${profileLabel(pk)} · ${profileDesc(pk)}`;
     return `<button class="profile${active ? " active" : ""}" data-pk="${escapeAttr(pk)}" ` +
       `title="${escapeAttr(tip)}" aria-label="${escapeAttr(profileLabel(pk))}">` +
-      `<span class="ico">${profileIcon(pk)}</span>${label}</button>`;
+      `<span class="ico">${profileIcon(pk)}</span></button>`;
   }).join("");
   const editTip = escapeAttr(t(state.lang, "customize"));
   html += `<button class="profile edit" id="editProfiles" title="${editTip}" aria-label="${editTip}">✏️</button>`;
@@ -143,7 +143,7 @@ function applyLang() {
   $("searchInput").placeholder = t(state.lang, "search_placeholder");
   document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(state.lang, el.dataset.i18n); });
   renderProfiles();
-  renderContext();
+  if (state.place) $("searchInput").value = state.place.name;
   updateChrome();
   if (state.notFound) renderNotFound();
   else if (state.days.length) renderForecast();
@@ -184,17 +184,23 @@ function toggleFavorite(p) {
   if (list.some((f) => favKey(f) === favKey(p))) list = list.filter((f) => favKey(f) !== favKey(p));
   else list.push({ name: p.name, admin1: p.admin1, country: p.country, lat: p.lat, lon: p.lon });
   saveFavorites(list);
-  renderContext();
-  if ($("results").classList.contains("open")) showFavorites();
+  if ($("results").classList.contains("open")) showQuickList();
 }
-function showFavorites() {
-  const list = getFavorites();
+function showQuickList() {
   const el = $("results");
-  if (!list.length) { closeResults(); return; }
-  el.innerHTML = list.map((f, i) =>
+  const p = state.place;
+  let html = "";
+  if (p && !isFavorite(p)) {
+    html += `<button data-savefav>☆ ${escapeHtml(t(state.lang, "save_favorite"))}: ${escapeHtml(p.name)}</button>`;
+  }
+  html += getFavorites().map((f, i) =>
     `<button data-fav="${i}">★ ${escapeHtml(f.name)}<span class="x" data-favx="${i}">✕</span></button>`
   ).join("");
+  if (!html) { closeResults(); return; }
+  el.innerHTML = html;
   el.classList.add("open");
+  const save = el.querySelector("[data-savefav]");
+  if (save) save.addEventListener("click", () => { toggleFavorite(p); });
   el.querySelectorAll("[data-fav]").forEach((c) => c.addEventListener("click", (e) => {
     if (e.target.dataset.favx != null) return;
     selectPlace(getFavorites()[+c.dataset.fav]);
@@ -202,7 +208,7 @@ function showFavorites() {
   el.querySelectorAll("[data-favx]").forEach((x) => x.addEventListener("click", (e) => {
     e.stopPropagation();
     saveFavorites(getFavorites().filter((_, i) => i !== +x.dataset.favx));
-    showFavorites();
+    showQuickList();
   }));
 }
 
@@ -211,11 +217,12 @@ let searchTimer = null;
 $("searchInput").addEventListener("input", (e) => {
   clearTimeout(searchTimer);
   const q = e.target.value.trim();
-  if (q.length < 2) { q ? closeResults() : showFavorites(); return; }
+  if (q.length < 2) { showQuickList(); return; }
   searchTimer = setTimeout(() => doSearch(q), 250);
 });
 $("searchInput").addEventListener("focus", () => {
-  if (!$("searchInput").value.trim()) showFavorites();
+  $("searchInput").select();
+  showQuickList();
 });
 async function doSearch(q) {
   try {
@@ -256,44 +263,33 @@ function useMyLocation() {
 }
 
 // ---------- URL routing ----------
-function pushUrl() {
-  if (!state.place) return;
-  const segs = [state.place.country, state.place.admin1, state.place.name]
-    .filter(Boolean).map(encodeURIComponent);
+function buildUrl(place) {
+  const segs = [place.country, place.admin1, place.name].filter(Boolean).map(encodeURIComponent);
   // No profile chosen means "general", so we leave the activity off the URL.
   let url = "/" + segs.join("/");
   if (state.profileKey !== "general") url += "/" + activityFor(state.profileKey);
-  // Carry the coordinates so a shared link always resolves to the exact place,
-  // even when the name is not in the geocoder (e.g. a municipality).
-  url += `?l=${(+state.place.lat).toFixed(4)},${(+state.place.lon).toFixed(4)}`;
-  if (location.pathname + location.search !== url) history.pushState({}, "", url);
+  return url;
+}
+function pushUrl() {
+  if (!state.place) return;
+  const url = buildUrl(state.place);
+  if (location.pathname !== url) history.pushState({}, "", url);
+}
+function canonicalizeUrl(place) {
+  // Correct the URL to the resolved place (e.g. /Gelderland/Amsterdam ->
+  // /Noord-Holland/Amsterdam) without adding a history entry.
+  const url = buildUrl(place);
+  if (location.pathname !== url) history.replaceState({}, "", url);
 }
 function parseUrl() {
   const segs = location.pathname.split("/").filter(Boolean).map(decodeURIComponent);
   let activity = null;
   if (segs.length && profileKeyFromActivity(segs[segs.length - 1])) activity = segs.pop();
-  let coords = null;
-  const l = new URLSearchParams(location.search).get("l");
-  if (l) {
-    const [a, b] = l.split(",");
-    const lat = parseFloat(a), lon = parseFloat(b);
-    if (isFinite(lat) && isFinite(lon)) coords = { lat, lon };
-  }
   return {
     city: segs[segs.length - 1] || null,
     admin1: segs[segs.length - 2] || null,
     country: segs[segs.length - 3] || null,
     activity,
-    coords,
-  };
-}
-function placeFromParsed(parsed) {
-  return {
-    name: parsed.city || t(state.lang, "today"),
-    admin1: parsed.admin1,
-    country: parsed.country,
-    lat: parsed.coords.lat,
-    lon: parsed.coords.lon,
   };
 }
 async function resolveFromPath(parsed) {
@@ -310,13 +306,13 @@ async function resolveFromPath(parsed) {
       if (m) pick = m;
     }
     selectPlace(pick, false);
+    canonicalizeUrl(pick);
   } catch { showNotFound(parsed.city); }
 }
 window.addEventListener("popstate", () => {
   const parsed = parseUrl();
   if (parsed.activity) { const pk = profileKeyFromActivity(parsed.activity); if (pk) state.profileKey = pk; }
-  if (parsed.coords) { renderProfiles(); selectPlace(placeFromParsed(parsed), false); }
-  else if (parsed.city) resolveFromPath(parsed);
+  if (parsed.city) resolveFromPath(parsed);
 });
 
 // ---------- Place selection & websocket ----------
@@ -325,11 +321,11 @@ function selectPlace(place, push = true) {
   state.notFound = null;
   state.days = [];
   state.expanded = new Set();
-  $("searchInput").value = "";
+  $("searchInput").value = place.name || "";
+  $("searchInput").blur();
   closeResults();
   localStorage.setItem("bw_last", JSON.stringify(place));
   if (push) pushUrl();
-  renderContext();
   updateChrome();
   $("forecast").innerHTML = "";
   subscribe(place);
@@ -362,7 +358,7 @@ function ensureSocket() {
 async function subscribe(place) {
   const myReq = ++state.reqId;
   state.scan = { done: 0, total: 0, sources: [], statuses: {} };
-  renderContext();
+  renderScan();
   try {
     const ws = await ensureSocket();
     if (myReq !== state.reqId) return;
@@ -374,17 +370,17 @@ function onMessage(ev) {
   if (msg.type === "providers") {
     state.sources = msg.sources;
     state.scan = { done: 0, total: msg.total, sources: msg.sources, statuses: {} };
-    renderContext(); renderSources();
+    renderScan(); renderSources();
   } else if (msg.type === "update") {
     state.scan.done = msg.done; state.scan.total = msg.total;
     state.scan.statuses[msg.provider] = msg.status;
     if (msg.changed) updateDays(msg.days);
-    renderContext(); renderSources();
+    renderScan(); renderSources();
     if (msg.changed) renderForecast();
   } else if (msg.type === "complete") {
     state.scan.done = msg.total;
     updateDays(msg.days);
-    renderContext(); renderSources(); renderForecast(); renderProfiles();
+    renderScan(true); renderSources(); renderForecast(); renderProfiles();
   }
 }
 function updateDays(days) {
@@ -401,19 +397,10 @@ function updateDays(days) {
 // ---------- Rendering ----------
 function setStatusText(text) { $("status").innerHTML = text ? `<span>${escapeHtml(text)}</span>` : ""; }
 
-function renderContext() {
-  const el = $("status");
-  if (state.notFound || !state.place) { el.innerHTML = ""; return; }
-  const p = state.place;
-  const sub = [p.admin1, p.country].filter(Boolean).join(", ");
-  const fav = isFavorite(p);
-  const scanning = state.scan && state.scan.total && state.scan.done < state.scan.total;
-  const star = t(state.lang, fav ? "remove_favorite" : "save_favorite");
-  el.innerHTML =
-    `<span class="ctx-place">📍 ${escapeHtml(p.name)}${sub ? `<span class="sub"> · ${escapeHtml(sub)}</span>` : ""}</span>` +
-    `<button class="star" id="favBtn" title="${escapeAttr(star)}" aria-label="${escapeAttr(star)}">${fav ? "★" : "☆"}</button>` +
-    (scanning ? `<span class="spinner"></span>` : "");
-  $("favBtn").addEventListener("click", () => toggleFavorite(p));
+function renderScan(done = false) {
+  const s = state.scan;
+  if (!s || !s.total || done) { $("status").innerHTML = ""; return; }
+  $("status").innerHTML = `<span class="spinner"></span><span>${escapeHtml(t(state.lang, "scanning", { done: s.done, total: s.total }))}</span>`;
 }
 function updateChrome() {
   const tag = $("tagline");
@@ -447,8 +434,8 @@ function hoursHtml(d, isToday) {
   if (!d.hourly || !d.hourly.length) return "";
   const nowH = new Date().getHours();
   const cells = d.hourly.filter((h) => !isToday || parseInt(h.time) >= nowH).map((h) =>
-    `<div class="hour"><div>${h.time}</div><div class="h-emoji">${emojiFor(h.code, h.precip, h.temp)}</div>` +
-    `<div class="h-temp">${r0(h.temp)}°</div><div>${r0(h.wind)}</div></div>`
+    `<div class="hour"><div class="h-time">${h.time}</div><div class="h-emoji">${emojiFor(h.code, h.precip, h.temp)}</div>` +
+    `<div class="h-temp">${r0(h.temp)}°</div><div class="h-wind">💨 ${r0(h.wind)}</div></div>`
   ).join("");
   return `<div class="hours">${cells}</div>`;
 }
@@ -475,12 +462,14 @@ function renderForecast() {
     const changed = state.changedDates.has(d.date) ? " changed" : "";
     return `
       <div class="day${changed}" data-day="${d.date}">
-        <div><div class="dow">${fmtDow(d.date)}</div><div class="date">${fmtDate(d.date)}</div></div>
-        <div class="emoji">${emojiFor(d.weather_code, d.precip_mm, d.temp_max)}</div>
-        <div class="meta">${escapeHtml(metaLine(d))}</div>
-        <div class="temps"><span class="tmax">${r0(d.temp_max)}°</span>${d.temp_min != null ? `<span class="tmin">${r0(d.temp_min)}°</span>` : ""}</div>
-      </div>
-      ${state.expanded.has(d.date) ? `<div class="grid-hours">${hoursHtml(d, false)}</div>` : ""}`;
+        <div class="day-row">
+          <div><div class="dow">${fmtDow(d.date)}</div><div class="date">${fmtDate(d.date)}</div></div>
+          <div class="emoji">${emojiFor(d.weather_code, d.precip_mm, d.temp_max)}</div>
+          <div class="meta">${escapeHtml(metaLine(d))}</div>
+          <div class="temps"><span class="tmax">${r0(d.temp_max)}°</span>${d.temp_min != null ? `<span class="tmin"> / ${r0(d.temp_min)}°</span>` : ""}</div>
+        </div>
+        ${state.expanded.has(d.date) ? hoursHtml(d, false) : ""}
+      </div>`;
   }).join("");
 
   $("forecast").innerHTML = todayHtml + `<div class="grid">${daysHtml}</div>`;
@@ -503,12 +492,13 @@ function openProfileModal() {
       ${fieldsHtml(p)}
     </div>`;
   }).join("");
-  const customs = getCustoms().map((c, i) =>
-    `<div class="prow" data-custom="${i}">
-      <div class="pname"><input class="name-input" data-f="name" value="${escapeAttr(c.name)}" placeholder="${escapeAttr(t(state.lang, "field_name"))}"></div>
-      <button class="linkbtn" data-del="${i}">${escapeHtml(t(state.lang, "delete"))}</button>
-      ${fieldsHtml(c)}
-    </div>`).join("");
+  const cust = getCustom() || { name: "", temp: 22, precip: 0, wind: 10 };
+  const customRow =
+    `<div class="prow" data-custom="1">
+      <div class="pname">✨ <input class="name-input" data-f="name" value="${escapeAttr(cust.name)}" placeholder="${escapeAttr(t(state.lang, "field_name"))}"></div>
+      <span></span>
+      ${fieldsHtml(cust)}
+    </div>`;
 
   $("profileModal").innerHTML = `
     <div class="modal-card">
@@ -519,8 +509,7 @@ function openProfileModal() {
       <h3>${escapeHtml(t(state.lang, "edit_builtin_title"))}</h3>
       ${builtins}
       <h3>${escapeHtml(t(state.lang, "custom_title"))}</h3>
-      <div id="customRows">${customs}</div>
-      <button class="btn" id="addCustom">＋ ${escapeHtml(t(state.lang, "add_custom"))}</button>
+      ${customRow}
       <div class="modal-actions">
         <button class="btn" id="modalCancel">${escapeHtml(t(state.lang, "close"))}</button>
         <button class="btn primary" id="modalSave">${escapeHtml(t(state.lang, "save"))}</button>
@@ -532,23 +521,12 @@ function openProfileModal() {
   $("modalCancel").addEventListener("click", closeModal);
   $("profileModal").addEventListener("click", (e) => { if (e.target.id === "profileModal") closeModal(); });
   $("modalSave").addEventListener("click", saveProfiles);
-  $("addCustom").addEventListener("click", () => {
-    const row = document.createElement("div");
-    row.className = "prow"; row.dataset.custom = "new";
-    row.innerHTML = `<div class="pname"><input class="name-input" data-f="name" placeholder="${escapeAttr(t(state.lang, "field_name"))}"></div>
-      <button class="linkbtn" data-delnew="1">${escapeHtml(t(state.lang, "delete"))}</button>
-      ${fieldsHtml({ temp: 22, precip: 0, wind: 10 })}`;
-    $("customRows").appendChild(row);
-    row.querySelector("[data-delnew]").addEventListener("click", () => row.remove());
-  });
   $("profileModal").querySelectorAll("[data-reset]").forEach((b) => b.addEventListener("click", () => {
     const k = b.dataset.reset, def = PROFILE_DEFAULTS[k], row = b.closest(".prow");
     row.querySelector('[data-f="temp"]').value = def.temp;
     row.querySelector('[data-f="precip"]').value = def.precip;
     row.querySelector('[data-f="wind"]').value = def.wind;
   }));
-  $("profileModal").querySelectorAll("[data-del]").forEach((b) =>
-    b.addEventListener("click", () => b.closest(".prow").remove()));
 }
 function fieldsHtml(p) {
   const f = (key, label, val) => `<label class="field">${escapeHtml(t(state.lang, label))}<input type="number" data-f="${key}" value="${val}"></label>`;
@@ -565,13 +543,18 @@ function saveProfiles() {
     if (p.temp !== def.temp || p.precip !== def.precip || p.wind !== def.wind) overrides[k] = p;
   });
   setOverrides(overrides);
-  const customs = [];
-  $("profileModal").querySelectorAll("[data-custom]").forEach((row) => {
-    const name = (row.querySelector('[data-f="name"]').value || "").trim();
-    if (!name) return;
-    customs.push({ name, ...readPoint(row) });
-  });
-  setCustoms(customs);
+  const crow = $("profileModal").querySelector("[data-custom]");
+  const cname = (crow.querySelector('[data-f="name"]').value || "").trim();
+  setCustom(cname ? { name: cname, ...readPoint(crow) } : null);
+  // If the active profile was a custom that no longer matches, fall back.
+  if (isCustomKey(state.profileKey)) {
+    const c = getCustom();
+    if (!c || customCode(c) !== state.profileKey) {
+      state.profileKey = "general";
+      localStorage.setItem("mw_profile", "general");
+      pushUrl();
+    }
+  }
   closeModal();
   renderProfiles();
   if (state.place) subscribe(state.place);
@@ -599,7 +582,6 @@ fetch("/api/health").then((r) => r.json()).then((d) => {
 (function boot() {
   const parsed = parseUrl();
   if (parsed.activity) { const pk = profileKeyFromActivity(parsed.activity); if (pk) { state.profileKey = pk; renderProfiles(); } }
-  if (parsed.coords) { selectPlace(placeFromParsed(parsed), false); return; }
   if (parsed.city) { resolveFromPath(parsed); return; }
   const last = localStorage.getItem("bw_last");
   if (last) { try { selectPlace(JSON.parse(last)); return; } catch {} }

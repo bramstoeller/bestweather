@@ -1,73 +1,68 @@
 # Deploying MooisteWeer
 
-The host runs nginx with Python 3.14 and passwordless sudo. The app lives in
-`/var/www/<domain>`, its vhost lives in this repo and is symlinked into
-`/etc/nginx/conf.d/`, and it runs as a systemd service on `127.0.0.1:8800`.
+The app is a git checkout on the server. The nginx vhost and the systemd unit
+are **symlinks into this checkout**, so a deploy is just `git pull` + restart.
 
-Set your own target first; nothing about the server is hard-coded in the repo:
+The host runs nginx with Python 3.14, passwordless sudo and SELinux. The app
+lives in `/var/www/<domain>` and runs as a systemd service on `127.0.0.1:8800`.
 
 ```bash
-HOST=user@your-server           # ssh target
-APPDIR=/var/www/mooisteweer.nl  # app directory on the server
+HOST=user@your-server
+APPDIR=/var/www/mooisteweer.nl
+REPO=https://github.com/<owner>/<repo>.git
 ```
 
-> Shared host: other vhosts may run here. Every step is additive and the nginx
-> change is staged so `nginx -t` can never fail on a missing TLS cert.
-
-## 1. Code + venv
+## First-time setup
 
 ```bash
-rsync -az --delete --exclude .venv --exclude .git --exclude __pycache__ --exclude .env --exclude ssl \
-  ./ "$HOST:$APPDIR/"
 ssh "$HOST" "bash -lc '
   cd $APPDIR
-  python3 -m venv .venv
-  .venv/bin/python -m pip install --upgrade pip
-  .venv/bin/pip install -r deploy/requirements-server.txt
-  [ -f .env ] || install -m 600 .env.example .env   # add API keys + CONTACT_EMAIL here
-  mkdir -p certbot ssl
+  git init -q && git remote add origin $REPO
+  git fetch -q origin && git checkout -f -b main origin/main
+  python3 -m venv .venv && .venv/bin/python -m pip install -q --upgrade pip
+  .venv/bin/pip install -q -r deploy/requirements-server.txt
+  [ -f .env ] || install -m 600 .env.example .env   # add API keys + CONTACT_EMAIL
+  mkdir -p ssl certbot
 '"
 ```
 
-On SELinux hosts the venv binaries must be executable by systemd, and the app
-port must be labelled as an http port:
+`.env`, `.venv`, `ssl/` and `certbot/` are gitignored, so `git pull` never
+touches them.
 
-```bash
-ssh "$HOST" 'sudo semanage fcontext -a -t bin_t "'"$APPDIR"'/.venv/bin(/.*)?" && sudo restorecon -RvF '"$APPDIR"'/.venv/bin'
-ssh "$HOST" 'sudo semanage port -a -t http_port_t -p tcp 8800 || true'
-```
-
-## 2. systemd service (localhost:8800)
+SELinux: the venv must be executable by systemd, the app port must be an http
+port, and the symlinked unit file needs the unit label:
 
 ```bash
 ssh "$HOST" "bash -lc '
-  sudo cp $APPDIR/deploy/bestweather.service /etc/systemd/system/bestweather.service
+  sudo semanage fcontext -a -t bin_t \"$APPDIR/.venv/bin(/.*)?\" && sudo restorecon -RvF $APPDIR/.venv/bin
+  sudo semanage port -a -t http_port_t -p tcp 8800 || true
+  sudo semanage fcontext -a -t systemd_unit_file_t \"$APPDIR/deploy/bestweather.service\" && sudo restorecon -v $APPDIR/deploy/bestweather.service
+'"
+```
+
+## Symlinks (service + vhost)
+
+```bash
+ssh "$HOST" "bash -lc '
+  sudo ln -sfn $APPDIR/deploy/bestweather.service /etc/systemd/system/bestweather.service
   sudo systemctl daemon-reload && sudo systemctl enable --now bestweather
-  sleep 2 && curl -fsS http://127.0.0.1:8800/api/health
-'"
-```
 
-## 3. nginx vhost
-
-HTTP first (safe before certs), then HTTPS once the cert files are in `ssl/`
-(`certificate.crt`, `certificate.key`, `cabundle.crt`):
-
-```bash
-# HTTP stage
-ssh "$HOST" "sudo ln -sfn $APPDIR/deploy/nginx.conf /etc/nginx/conf.d/mooisteweer.nl.conf && sudo nginx -t && sudo systemctl reload nginx"
-
-# HTTPS stage: build the full chain, then switch the vhost
-ssh "$HOST" "bash -lc '
-  cat $APPDIR/ssl/certificate.crt $APPDIR/ssl/cabundle.crt > $APPDIR/ssl/fullchain.crt
   sudo ln -sfn $APPDIR/deploy/nginx-https.conf /etc/nginx/conf.d/mooisteweer.nl.conf
+  cat $APPDIR/ssl/certificate.crt $APPDIR/ssl/cabundle.crt > $APPDIR/ssl/fullchain.crt
   sudo nginx -t && sudo systemctl reload nginx
 '"
 ```
 
-## Update later
+(Before the TLS certs land, point the conf.d symlink at `deploy/nginx.conf` for
+an HTTP-only stage so `nginx -t` cannot fail on a missing cert.)
+
+## Deploy an update
 
 ```bash
-rsync -az --exclude .venv --exclude .git --exclude __pycache__ --exclude .env --exclude ssl \
-  ./ "$HOST:$APPDIR/"
-ssh "$HOST" "cd $APPDIR && .venv/bin/pip install -r deploy/requirements-server.txt && sudo systemctl restart bestweather"
+ssh "$HOST" "$APPDIR/deploy/update.sh"
 ```
+
+`update.sh` pulls, installs deps and restarts the service. The vhost and unit
+are symlinks, so changes to them land on `git pull`; reload nginx
+(`sudo nginx -t && sudo systemctl reload nginx`) when the vhost changed, and
+`sudo systemctl daemon-reload` when the unit changed.

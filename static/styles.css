@@ -92,13 +92,10 @@ body {
 .profile.edit { color: var(--muted); }
 
 .context {
-  display: flex; align-items: center; gap: 8px; min-height: 24px; margin: 4px 0 12px;
-  font-size: 1rem; font-weight: 600;
+  display: flex; align-items: center; gap: 8px; min-height: 0;
+  font-size: 0.82rem; color: var(--muted); margin: 0 0 12px;
 }
-.context .ctx-place { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.context .sub { color: var(--muted); font-weight: 400; font-size: 0.85rem; }
-.context .star { background: none; border: none; cursor: pointer; font-size: 1.15rem; color: var(--accent); padding: 0; line-height: 1; }
-.context .spinner { margin-left: auto; }
+.context:empty { margin: 0; }
 .spinner {
   width: 13px; height: 13px; border-radius: 50%;
   border: 2px solid var(--border); border-top-color: var(--accent);
@@ -120,11 +117,10 @@ body {
 
 .grid { display: grid; gap: 8px; }
 .day {
-  display: grid; grid-template-columns: 44px 28px 1fr auto; align-items: center; gap: 10px;
   background: var(--card); border: 1px solid var(--border); border-radius: 12px;
-  padding: 11px 14px; min-height: 56px; cursor: pointer;
+  padding: 11px 14px; cursor: pointer;
 }
-.day .meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.day-row { display: grid; grid-template-columns: 44px 28px 1fr auto; align-items: center; gap: 10px; }
 .day.changed { animation: pop 0.5s ease; }
 @keyframes pop {
   0% { box-shadow: 0 0 0 0 var(--accent-2); }
@@ -134,18 +130,21 @@ body {
 .day .dow { font-weight: 700; }
 .day .date { font-size: 0.72rem; color: var(--muted); }
 .day .emoji { font-size: 1.45rem; text-align: center; }
-.day .meta { font-size: 0.78rem; color: var(--muted); }
+.day .meta { font-size: 0.78rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .day .temps { text-align: right; white-space: nowrap; }
 .day .tmax { font-weight: 700; font-size: 1.05rem; }
-.day .tmin { color: var(--muted); font-size: 0.85rem; margin-left: 4px; }
+.day .tmin { color: var(--muted); font-size: 0.9rem; }
 
 .hours {
-  display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 10px;
-  margin: -2px 0 7px; scrollbar-width: thin;
+  display: flex; gap: 12px; overflow-x: auto; scrollbar-width: thin;
+  padding-top: 9px; margin-top: 9px; border-top: 1px solid var(--border);
 }
-.hour { flex: none; text-align: center; font-size: 0.72rem; color: var(--muted); min-width: 42px; }
+.today-card .hours { border-top-color: rgba(0, 0, 0, 0.15); }
+.hour { flex: none; text-align: center; font-size: 0.72rem; min-width: 46px; }
+.hour .h-time { opacity: 0.7; }
 .hour .h-emoji { font-size: 1.1rem; }
-.hour .h-temp { font-weight: 700; color: var(--text); font-size: 0.82rem; }
+.hour .h-temp { font-weight: 700; font-size: 0.85rem; }
+.hour .h-wind { opacity: 0.7; white-space: nowrap; }
 
 .hint, .notfound { color: var(--muted); text-align: center; padding: 36px 16px; font-size: 0.95rem; }
 .notfound { color: var(--text); }
@@ -176,7 +175,8 @@ body {
 .footer { text-align: center; color: var(--muted); font-size: 0.72rem; margin-top: 24px; }
 
 @media (min-width: 720px) {
-  .day { grid-template-columns: 56px 32px 1fr auto; padding: 12px 16px; }
+  .day-row { grid-template-columns: 56px 32px 1fr auto; }
+  .day { padding: 12px 16px; }
   .day .tmax { font-size: 1.1rem; }
   .today-temp { font-size: 3.4rem; }
 }

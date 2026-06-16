@@ -1,4 +1,8 @@
-"""Buienradar: keyless Dutch forecast. The feed is a national 5-day outlook."""
+"""Buienradar: keyless Dutch forecast. The feed is a national 5-day outlook.
+
+Buienradar's JSON has shipped with both PascalCase and lowercase keys, so we
+lower-case every key before reading it.
+"""
 
 from typing import List, Optional
 
@@ -8,15 +12,25 @@ from ..models import DayForecast
 from .base import Provider
 
 
-def _beaufort_to_kmh(bft) -> Optional[float]:
-    if bft is None:
+def _lower(d: dict) -> dict:
+    return {k.lower(): v for k, v in d.items()} if isinstance(d, dict) else {}
+
+
+def _num(v) -> Optional[float]:
+    try:
+        return float(v)
+    except (TypeError, ValueError):
         return None
-    return round(0.836 * (float(bft) ** 1.5) * 3.6, 1)
 
 
 def _avg(*values) -> Optional[float]:
-    nums = [float(v) for v in values if v is not None]
+    nums = [n for n in (_num(v) for v in values) if n is not None]
     return sum(nums) / len(nums) if nums else None
+
+
+def _beaufort_to_kmh(bft) -> Optional[float]:
+    n = _num(bft)
+    return round(0.836 * (n ** 1.5) * 3.6, 1) if n is not None else None
 
 
 class Buienradar(Provider):
@@ -27,25 +41,30 @@ class Buienradar(Provider):
     async def fetch(self, client, lat, lon) -> List[DayForecast]:
         resp = await client.get("https://data.buienradar.nl/2.0/feed/json")
         resp.raise_for_status()
-        forecast = resp.json()["Forecast"]["FiveDayForecast"]
+        root = _lower(resp.json())
+        forecast = _lower(root.get("forecast"))
+        days_in = forecast.get("fivedayforecast") or []
 
         out: List[DayForecast] = []
-        for d in forecast:
-            # Temperatures come as numeric Min/Max bound fields; the plain
-            # MaxTemperature field is sometimes a "25/28" range string.
-            temp_max = _avg(d.get("MaxTemperatureMin"), d.get("MaxTemperatureMax"))
-            temp_min = _avg(d.get("MinTemperatureMin"), d.get("MinTemperatureMax"))
+        for entry in days_in:
+            d = _lower(entry)
+            temp_max = _avg(d.get("maxtemperaturemin"), d.get("maxtemperaturemax"))
+            temp_min = _avg(d.get("mintemperaturemin"), d.get("mintemperaturemax"))
+            if temp_max is None:
+                temp_max = _num(d.get("maxtemperature"))
+                temp_min = _num(d.get("mintemperature"))
             if temp_max is None:
                 continue
-            precip = _avg(d.get("RainMinMm"), d.get("RainMaxMm")) or 0.0
+            precip = _avg(d.get("mmrainmin"), d.get("mmrainmax")) or 0.0
+            rain_chance = d.get("rainchance")
             out.append(
                 DayForecast(
-                    date=str(d["Day"])[:10],
+                    date=str(d.get("day"))[:10],
                     temp_max=round(temp_max, 1),
                     temp_min=round(temp_min, 1) if temp_min is not None else None,
                     precip_mm=round(precip, 1),
-                    precip_prob=int(d["RainChance"]) if d.get("RainChance") is not None else None,
-                    wind_kmh=_beaufort_to_kmh(d.get("WindBeaufort")),
+                    precip_prob=int(rain_chance) if rain_chance is not None else None,
+                    wind_kmh=_beaufort_to_kmh(d.get("windbeaufort", d.get("wind"))),
                 )
             )
         return out
