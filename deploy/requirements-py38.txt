@@ -1,0 +1,8 @@
+# Pinned for the mooisteweer.nl server (Ubuntu 18.04, Python 3.8.0).
+# Lean set: no uvloop/httptools/watchfiles — plain asyncio + the websockets lib,
+# which is all the app needs in production (no --reload).
+fastapi==0.115.6
+uvicorn==0.33.0
+websockets==13.1
+httpx==0.28.1
+python-dotenv==1.0.1
