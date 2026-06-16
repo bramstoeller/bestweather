@@ -465,8 +465,7 @@ function renderForecast() {
         </div>
         <div class="today-emoji">${emojiFor(today.weather_code, today.precip_mm, today.temp_max)}</div>
       </div>
-      <div class="today-source">${escapeHtml(t(state.lang, "source"))}: <a class="src-link" href="${escapeAttr(sourceLinkFor(today.source))}" target="_blank" rel="noopener">${escapeHtml(today.source || "-")}</a></div>
-      ${state.expanded.has(today.date) ? hoursHtml(today, true) : ""}
+      ${state.expanded.has(today.date) ? `<div class="today-source">${escapeHtml(t(state.lang, "source"))}: <a class="src-link" href="${escapeAttr(sourceLinkFor(today.source))}" target="_blank" rel="noopener">${escapeHtml(today.source || "-")}</a></div>${hoursHtml(today, true)}` : ""}
     </div>`;
 
   const daysHtml = rest.map((d) => {
@@ -478,7 +477,7 @@ function renderForecast() {
           <div class="emoji">${emojiFor(d.weather_code, d.precip_mm, d.temp_max)}</div>
           <div class="mid">
             <div class="meta">${escapeHtml(metaLine(d))}</div>
-            ${d.source ? `<a class="src" href="${escapeAttr(sourceLinkFor(d.source))}" target="_blank" rel="noopener">${escapeHtml(d.source)}</a>` : ""}
+            ${state.expanded.has(d.date) && d.source ? `<a class="src" href="${escapeAttr(sourceLinkFor(d.source))}" target="_blank" rel="noopener">${escapeHtml(d.source)}</a>` : ""}
           </div>
           <div class="temps"><span class="tmax">${r0(d.temp_max)}°</span>${d.temp_min != null ? `<span class="tmin"> / ${r0(d.temp_min)}°</span>` : ""}</div>
         </div>
