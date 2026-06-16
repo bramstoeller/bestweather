@@ -11,3 +11,6 @@ ssl/
 *.crt
 *.pem
 *.p7b
+
+# Generated on the server
+deploy/requirements-server.lock.txt

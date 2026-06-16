@@ -36,15 +36,22 @@ port, and the symlinked unit file needs the unit label:
 ssh "$HOST" "bash -lc '
   sudo semanage fcontext -a -t bin_t \"$APPDIR/.venv/bin(/.*)?\" && sudo restorecon -RvF $APPDIR/.venv/bin
   sudo semanage port -a -t http_port_t -p tcp 8800 || true
-  sudo semanage fcontext -a -t systemd_unit_file_t \"$APPDIR/deploy/bestweather.service\" && sudo restorecon -v $APPDIR/deploy/bestweather.service
+  # The symlinked unit target must carry the unit label (restorecon needs -F).
+  sudo semanage fcontext -a -t systemd_unit_file_t \"$APPDIR/deploy/bestweather.service\" && sudo restorecon -vF $APPDIR/deploy/bestweather.service
 '"
 ```
 
 ## Symlinks (service + vhost)
 
+The repo's unit uses a generic `User=deploy`. Keep your real deploy user out of
+the repo with a server-local drop-in:
+
 ```bash
+DEPLOY_USER=youruser   # the account the service runs as
 ssh "$HOST" "bash -lc '
   sudo ln -sfn $APPDIR/deploy/bestweather.service /etc/systemd/system/bestweather.service
+  sudo mkdir -p /etc/systemd/system/bestweather.service.d
+  printf \"[Service]\nUser=$DEPLOY_USER\nGroup=$DEPLOY_USER\n\" | sudo tee /etc/systemd/system/bestweather.service.d/override.conf
   sudo systemctl daemon-reload && sudo systemctl enable --now bestweather
 
   sudo ln -sfn $APPDIR/deploy/nginx-https.conf /etc/nginx/conf.d/mooisteweer.nl.conf
