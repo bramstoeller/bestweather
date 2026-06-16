@@ -135,7 +135,7 @@ function applyLang() {
   document.title = t(state.lang, "meta_title");
   const md = document.querySelector('meta[name="description"]');
   if (md) md.setAttribute("content", t(state.lang, "meta_description"));
-  document.querySelector(".brand h1").innerHTML = brandHtml();
+  document.querySelector(".brand").innerHTML = brandHtml();
   $("langBtn").textContent = state.lang === "nl" ? "EN" : "NL";
   $("langBtn").setAttribute("aria-label", t(state.lang, "aria_lang"));
   $("themeBtn").setAttribute("aria-label", t(state.lang, "aria_theme"));
@@ -143,8 +143,8 @@ function applyLang() {
   $("searchInput").placeholder = t(state.lang, "search_placeholder");
   document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(state.lang, el.dataset.i18n); });
   renderProfiles();
-  renderFavorites();
-  renderPlaceName();
+  renderContext();
+  updateChrome();
   if (state.notFound) renderNotFound();
   else if (state.days.length) renderForecast();
 }
@@ -184,23 +184,25 @@ function toggleFavorite(p) {
   if (list.some((f) => favKey(f) === favKey(p))) list = list.filter((f) => favKey(f) !== favKey(p));
   else list.push({ name: p.name, admin1: p.admin1, country: p.country, lat: p.lat, lon: p.lon });
   saveFavorites(list);
-  renderFavorites();
-  renderPlaceName();
+  renderContext();
+  if ($("results").classList.contains("open")) showFavorites();
 }
-function renderFavorites() {
-  const el = $("favorites");
+function showFavorites() {
   const list = getFavorites();
+  const el = $("results");
+  if (!list.length) { closeResults(); return; }
   el.innerHTML = list.map((f, i) =>
-    `<span class="chip" data-fav="${i}">📍 ${escapeHtml(f.name)} <span class="x" data-favx="${i}">✕</span></span>`
+    `<button data-fav="${i}">★ ${escapeHtml(f.name)}<span class="x" data-favx="${i}">✕</span></button>`
   ).join("");
+  el.classList.add("open");
   el.querySelectorAll("[data-fav]").forEach((c) => c.addEventListener("click", (e) => {
     if (e.target.dataset.favx != null) return;
-    selectPlace(list[+c.dataset.fav]);
+    selectPlace(getFavorites()[+c.dataset.fav]);
   }));
   el.querySelectorAll("[data-favx]").forEach((x) => x.addEventListener("click", (e) => {
     e.stopPropagation();
     saveFavorites(getFavorites().filter((_, i) => i !== +x.dataset.favx));
-    renderFavorites(); renderPlaceName();
+    showFavorites();
   }));
 }
 
@@ -209,8 +211,11 @@ let searchTimer = null;
 $("searchInput").addEventListener("input", (e) => {
   clearTimeout(searchTimer);
   const q = e.target.value.trim();
-  if (q.length < 2) { closeResults(); return; }
+  if (q.length < 2) { q ? closeResults() : showFavorites(); return; }
   searchTimer = setTimeout(() => doSearch(q), 250);
+});
+$("searchInput").addEventListener("focus", () => {
+  if (!$("searchInput").value.trim()) showFavorites();
 });
 async function doSearch(q) {
   try {
@@ -258,17 +263,37 @@ function pushUrl() {
   // No profile chosen means "general", so we leave the activity off the URL.
   let url = "/" + segs.join("/");
   if (state.profileKey !== "general") url += "/" + activityFor(state.profileKey);
-  if (location.pathname !== url) history.pushState({}, "", url);
+  // Carry the coordinates so a shared link always resolves to the exact place,
+  // even when the name is not in the geocoder (e.g. a municipality).
+  url += `?l=${(+state.place.lat).toFixed(4)},${(+state.place.lon).toFixed(4)}`;
+  if (location.pathname + location.search !== url) history.pushState({}, "", url);
 }
 function parseUrl() {
   const segs = location.pathname.split("/").filter(Boolean).map(decodeURIComponent);
   let activity = null;
   if (segs.length && profileKeyFromActivity(segs[segs.length - 1])) activity = segs.pop();
+  let coords = null;
+  const l = new URLSearchParams(location.search).get("l");
+  if (l) {
+    const [a, b] = l.split(",");
+    const lat = parseFloat(a), lon = parseFloat(b);
+    if (isFinite(lat) && isFinite(lon)) coords = { lat, lon };
+  }
   return {
     city: segs[segs.length - 1] || null,
     admin1: segs[segs.length - 2] || null,
     country: segs[segs.length - 3] || null,
     activity,
+    coords,
+  };
+}
+function placeFromParsed(parsed) {
+  return {
+    name: parsed.city || t(state.lang, "today"),
+    admin1: parsed.admin1,
+    country: parsed.country,
+    lat: parsed.coords.lat,
+    lon: parsed.coords.lon,
   };
 }
 async function resolveFromPath(parsed) {
@@ -289,7 +314,9 @@ async function resolveFromPath(parsed) {
 }
 window.addEventListener("popstate", () => {
   const parsed = parseUrl();
-  if (parsed.city) resolveFromPath(parsed);
+  if (parsed.activity) { const pk = profileKeyFromActivity(parsed.activity); if (pk) state.profileKey = pk; }
+  if (parsed.coords) { renderProfiles(); selectPlace(placeFromParsed(parsed), false); }
+  else if (parsed.city) resolveFromPath(parsed);
 });
 
 // ---------- Place selection & websocket ----------
@@ -302,7 +329,8 @@ function selectPlace(place, push = true) {
   closeResults();
   localStorage.setItem("bw_last", JSON.stringify(place));
   if (push) pushUrl();
-  renderPlaceName();
+  renderContext();
+  updateChrome();
   $("forecast").innerHTML = "";
   subscribe(place);
 }
@@ -310,9 +338,9 @@ function showNotFound(q) {
   state.place = null;
   state.notFound = q;
   state.days = [];
-  $("placeName").innerHTML = "";
   $("status").innerHTML = "";
   $("sourcesBox").hidden = true;
+  updateChrome();
   renderNotFound();
 }
 function renderNotFound() {
@@ -334,7 +362,7 @@ function ensureSocket() {
 async function subscribe(place) {
   const myReq = ++state.reqId;
   state.scan = { done: 0, total: 0, sources: [], statuses: {} };
-  renderStatus();
+  renderContext();
   try {
     const ws = await ensureSocket();
     if (myReq !== state.reqId) return;
@@ -346,17 +374,17 @@ function onMessage(ev) {
   if (msg.type === "providers") {
     state.sources = msg.sources;
     state.scan = { done: 0, total: msg.total, sources: msg.sources, statuses: {} };
-    renderStatus(); renderSources();
+    renderContext(); renderSources();
   } else if (msg.type === "update") {
     state.scan.done = msg.done; state.scan.total = msg.total;
     state.scan.statuses[msg.provider] = msg.status;
     if (msg.changed) updateDays(msg.days);
-    renderStatus(); renderSources();
+    renderContext(); renderSources();
     if (msg.changed) renderForecast();
   } else if (msg.type === "complete") {
     state.scan.done = msg.total;
     updateDays(msg.days);
-    renderStatus(true); renderSources(); renderForecast(); renderProfiles();
+    renderContext(); renderSources(); renderForecast(); renderProfiles();
   }
 }
 function updateDays(days) {
@@ -371,24 +399,25 @@ function updateDays(days) {
 }
 
 // ---------- Rendering ----------
-function renderPlaceName() {
-  const el = $("placeName");
-  if (!state.place) { el.innerHTML = ""; return; }
+function setStatusText(text) { $("status").innerHTML = text ? `<span>${escapeHtml(text)}</span>` : ""; }
+
+function renderContext() {
+  const el = $("status");
+  if (state.notFound || !state.place) { el.innerHTML = ""; return; }
   const p = state.place;
   const sub = [p.admin1, p.country].filter(Boolean).join(", ");
   const fav = isFavorite(p);
+  const scanning = state.scan && state.scan.total && state.scan.done < state.scan.total;
+  const star = t(state.lang, fav ? "remove_favorite" : "save_favorite");
   el.innerHTML =
-    `<span>📍 ${escapeHtml(p.name)}${sub ? ` <span class="sub">· ${escapeHtml(sub)}</span>` : ""}</span>` +
-    `<button class="icon-btn" id="favBtn" title="${escapeAttr(t(state.lang, fav ? "remove_favorite" : "save_favorite"))}" style="width:34px;height:34px;font-size:1rem">${fav ? "★" : "☆"}</button>`;
+    `<span class="ctx-place">📍 ${escapeHtml(p.name)}${sub ? `<span class="sub"> · ${escapeHtml(sub)}</span>` : ""}</span>` +
+    `<button class="star" id="favBtn" title="${escapeAttr(star)}" aria-label="${escapeAttr(star)}">${fav ? "★" : "☆"}</button>` +
+    (scanning ? `<span class="spinner"></span>` : "");
   $("favBtn").addEventListener("click", () => toggleFavorite(p));
 }
-
-function setStatusText(text) { $("status").innerHTML = text ? `<span>${escapeHtml(text)}</span>` : ""; }
-function renderStatus(done = false) {
-  const s = state.scan;
-  if (!s || !s.total) return;
-  const text = done ? t(state.lang, "all_done", { total: s.total }) : t(state.lang, "scanning", { done: s.done, total: s.total });
-  $("status").innerHTML = `${done ? "" : '<span class="spinner"></span>'}<span>${escapeHtml(text)}</span>`;
+function updateChrome() {
+  const tag = $("tagline");
+  if (tag) tag.style.display = (state.place || state.notFound) ? "none" : "";
 }
 function renderSources() {
   const sources = state.scan && state.scan.sources.length ? state.scan.sources : state.sources;
@@ -569,8 +598,9 @@ fetch("/api/health").then((r) => r.json()).then((d) => {
 
 (function boot() {
   const parsed = parseUrl();
-  if (parsed.city) { resolveFromPath(parsed); return; }
   if (parsed.activity) { const pk = profileKeyFromActivity(parsed.activity); if (pk) { state.profileKey = pk; renderProfiles(); } }
+  if (parsed.coords) { selectPlace(placeFromParsed(parsed), false); return; }
+  if (parsed.city) { resolveFromPath(parsed); return; }
   const last = localStorage.getItem("bw_last");
   if (last) { try { selectPlace(JSON.parse(last)); return; } catch {} }
   if (navigator.geolocation) useMyLocation();
