@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#ff8a2b" />
+  <title>BestWeather</title>
+  <meta name="description" content="The warmest & driest forecast, from every free weather API." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☀️</text></svg>" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="brand">
+        <h1>Best<span class="accent">Weather</span></h1>
+        <div class="tagline" data-i18n="tagline"></div>
+      </div>
+      <button class="icon-btn" id="langBtn" title="Language">NL</button>
+      <button class="icon-btn" id="themeBtn" title="Theme">🌙</button>
+    </header>
+
+    <div class="search">
+      <div class="search-row">
+        <input id="searchInput" type="text" autocomplete="off" />
+        <button class="icon-btn" id="locBtn" title="Use my location">📍</button>
+      </div>
+      <div class="results" id="results"></div>
+    </div>
+
+    <div class="favorites" id="favorites"></div>
+
+    <div class="place-name" id="placeName"></div>
+    <div class="status" id="status"></div>
+
+    <div id="forecast">
+      <div class="hint" id="hint" data-i18n="pick_location"></div>
+    </div>
+
+    <div class="footer">
+      BestWeather · mooisteweer.nl · <span id="footerSources"></span>
+    </div>
+  </div>
+
+  <script src="/i18n.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
