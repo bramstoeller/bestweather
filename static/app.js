@@ -1,4 +1,4 @@
-// AltijdMooiWeer frontend: geolocation, search, favorites, weather profiles,
+// Altijd mooi weer! frontend: geolocation, search, favorites, weather profiles,
 // per-place URLs, hourly detail, and the live websocket that streams the best
 // forecast as each server-side source returns.
 
@@ -100,9 +100,19 @@ function profileRelevant(key) {
 
 function renderProfiles() {
   const el = $("profiles");
-  const builtins = PROFILE_ORDER.filter((k) => k === "general" || k === state.profileKey || profileRelevant(k));
   const custom = getCustom();
-  const keys = [...builtins, ...(custom ? [customCode(custom)] : [])];
+  // Priority: general first, then PROFILE_ORDER, season-filtered; custom last.
+  let keys = PROFILE_ORDER.filter((k) => k === "general" || profileRelevant(k));
+  if (custom) keys.push(customCode(custom));
+  if (!keys.includes(state.profileKey)) keys.unshift(state.profileKey);
+  // Show as many as fit the width; the rest stay reachable via the editor.
+  const avail = el.clientWidth || Math.min(672, window.innerWidth - 28);
+  const perChip = 54; // icon chip (~46px) + gap; one slot reserved for the editor
+  const maxChips = Math.max(3, Math.floor((avail - perChip) / perChip));
+  if (keys.length > maxChips) {
+    keys = keys.slice(0, maxChips);
+    if (!keys.includes(state.profileKey)) keys[keys.length - 1] = state.profileKey;
+  }
   let html = keys.map((pk) => {
     const active = pk === state.profileKey;
     const tip = `${profileLabel(pk)} · ${profileDesc(pk)}`;
@@ -135,7 +145,7 @@ function toggleTheme() {
   applyTheme();
 }
 function brandHtml() {
-  return state.lang === "nl" ? 'AltijdMooi<span class="accent">Weer</span>' : 'Best<span class="accent">Weather</span>';
+  return state.lang === "nl" ? "Altijd mooi weer!" : 'Best<span class="accent">Weather</span>';
 }
 function applyLang() {
   document.documentElement.lang = state.lang;
@@ -625,6 +635,8 @@ function escapeAttr(s) { return escapeHtml(s); }
 // ---------- Boot ----------
 $("themeBtn").addEventListener("click", toggleTheme);
 $("langBtn").addEventListener("click", toggleLang);
+let resizeTimer = null;
+window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(renderProfiles, 150); });
 applyTheme();
 applyLang();
 

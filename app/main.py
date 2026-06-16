@@ -18,7 +18,7 @@ from .scoring import resolve_profile
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 INDEX = STATIC_DIR / "index.html"
 
-app = FastAPI(title="AltijdMooiWeer", version=__version__)
+app = FastAPI(title="Altijd mooi weer!", version=__version__)
 
 
 @app.get("/api/health")
