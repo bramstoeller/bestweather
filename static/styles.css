@@ -205,16 +205,20 @@ body {
 @media (min-width: 600px) { .modal { align-items: center; } .modal-card { border-radius: 18px; } }
 .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .modal-head h2 { font-size: 1.1rem; margin: 0; }
-.modal h3 { font-size: 0.82rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 18px 0 8px; }
+.modal h3 { font-size: 0.82rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 18px 0 4px; }
+.modal-hint { font-size: 0.76rem; color: var(--muted); margin: 0 0 10px; }
 .prow {
-  display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center;
   background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px;
 }
-.prow .pname { font-weight: 600; display: flex; align-items: center; gap: 7px; }
-.prow .fields { display: flex; gap: 8px; grid-column: 1 / -1; flex-wrap: wrap; }
-.field { display: flex; flex-direction: column; font-size: 0.68rem; color: var(--muted); gap: 3px; }
-.field input { width: 72px; padding: 7px 8px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); color: var(--text); font-size: 0.9rem; }
-.field input.name-input { width: 130px; }
+.prow .pname { font-weight: 600; display: flex; align-items: center; gap: 7px; justify-content: space-between; margin-bottom: 8px; }
+.crits { display: flex; flex-direction: column; gap: 7px; }
+.crit { display: flex; align-items: center; gap: 10px; }
+.clabel { width: 96px; font-size: 0.78rem; color: var(--muted); }
+.cinput { width: 62px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); color: var(--text); font-size: 0.9rem; }
+.name-input { width: 150px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); color: var(--text); font-size: 0.95rem; font-weight: 600; }
+.wbar { display: flex; gap: 4px; margin-left: auto; }
+.wbar span { width: 18px; height: 18px; border-radius: 5px; background: var(--border); cursor: pointer; transition: background 0.12s; }
+.wbar span.on { background: var(--accent); }
 .linkbtn { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.8rem; padding: 4px; }
 .linkbtn.reset { font-size: 1.2rem; line-height: 1; padding: 2px 6px; }
 .btn {

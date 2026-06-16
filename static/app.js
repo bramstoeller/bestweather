@@ -3,15 +3,17 @@
 // forecast as each server-side source returns.
 
 const PROFILE_ORDER = ["general", "beach", "bbq", "outdoor", "windwater", "skating", "skiing"];
+// temp/precip/wind targets + weights (tw/pw/ww, 0-4) per profile.
 const PROFILE_DEFAULTS = {
-  general: { temp: 24, precip: 0, wind: 10 },
-  beach: { temp: 29, precip: 0, wind: 8 },
-  bbq: { temp: 24, precip: 0, wind: 8 },
-  outdoor: { temp: 16, precip: 0, wind: 16 },
-  windwater: { temp: 20, precip: 0, wind: 32 },
-  skating: { temp: -6, precip: 0, wind: 8 },
-  skiing: { temp: -3, precip: 6, wind: 12 },
+  general: { temp: 24, precip: 0, wind: 10, tw: 2, pw: 3, ww: 1 },
+  beach: { temp: 29, precip: 0, wind: 8, tw: 3, pw: 2, ww: 1 },
+  bbq: { temp: 24, precip: 0, wind: 8, tw: 1, pw: 3, ww: 2 },
+  outdoor: { temp: 16, precip: 0, wind: 16, tw: 2, pw: 2, ww: 1 },
+  windwater: { temp: 20, precip: 0, wind: 32, tw: 1, pw: 1, ww: 3 },
+  skating: { temp: -6, precip: 0, wind: 8, tw: 3, pw: 2, ww: 1 },
+  skiing: { temp: -3, precip: 6, wind: 12, tw: 2, pw: 3, ww: 1 },
 };
+const WEIGHTS_FALLBACK = { tw: 2, pw: 3, ww: 1 };
 const PROFILE_ICON = {
   general: "🌤️", beach: "🏖️", bbq: "🍖", outdoor: "🏃",
   windwater: "🏄", skating: "⛸️", skiing: "⛷️",
@@ -47,15 +49,20 @@ function getCustom() { try { return JSON.parse(localStorage.getItem("mw_custom")
 function setCustom(obj) { if (obj) localStorage.setItem("mw_custom", JSON.stringify(obj)); else localStorage.removeItem("mw_custom"); }
 
 function num(x) { return Number.isInteger(x) ? x : Math.round(x * 10) / 10; }
-function customCode(p) { return `t${num(p.temp)}p${num(p.precip)}w${num(p.wind)}`; }
+function withWeights(p) {
+  return { tw: WEIGHTS_FALLBACK.tw, pw: WEIGHTS_FALLBACK.pw, ww: WEIGHTS_FALLBACK.ww, ...p };
+}
+function customCode(p) { return `t${num(p.temp)}p${num(p.precip)}w${num(p.wind)}-${p.tw}${p.pw}${p.ww}`; }
 function parseCode(code) {
-  const m = /^t(-?\d+(?:\.\d+)?)p(\d+(?:\.\d+)?)w(\d+(?:\.\d+)?)$/.exec(code || "");
-  return m ? { temp: +m[1], precip: +m[2], wind: +m[3] } : null;
+  const m = /^t(-?\d+(?:\.\d+)?)p(\d+(?:\.\d+)?)w(\d+(?:\.\d+)?)(?:-([0-4])([0-4])([0-4]))?$/.exec(code || "");
+  if (!m) return null;
+  const w = m[4] != null ? { tw: +m[4], pw: +m[5], ww: +m[6] } : WEIGHTS_FALLBACK;
+  return { temp: +m[1], precip: +m[2], wind: +m[3], ...w };
 }
 function isCustomKey(pk) { return !PROFILE_DEFAULTS[pk] && !!parseCode(pk); }
 function pointFor(pk) {
-  if (PROFILE_DEFAULTS[pk]) return getOverrides()[pk] || PROFILE_DEFAULTS[pk];
-  return parseCode(pk) || PROFILE_DEFAULTS.general;
+  if (PROFILE_DEFAULTS[pk]) return withWeights(getOverrides()[pk] || PROFILE_DEFAULTS[pk]);
+  return parseCode(pk) || withWeights(PROFILE_DEFAULTS.general);
 }
 function activityFor(pk) { return PROFILE_DEFAULTS[pk] ? PROFILE_SLUG[pk] : pk; }
 function wsProfile(pk) { return customCode(pointFor(pk)); }
@@ -507,18 +514,17 @@ function toggleDay(date) {
 function openProfileModal() {
   const o = getOverrides();
   const builtins = PROFILE_ORDER.map((k) => {
-    const p = o[k] || PROFILE_DEFAULTS[k];
+    const p = withWeights(o[k] || PROFILE_DEFAULTS[k]);
     return `<div class="prow" data-builtin="${k}">
-      <div class="pname">${PROFILE_ICON[k]} ${escapeHtml(t(state.lang, "profile_" + k))}</div>
-      <button class="linkbtn reset" data-reset="${k}" title="${escapeAttr(t(state.lang, "reset_default"))}" aria-label="${escapeAttr(t(state.lang, "reset_default"))}">↺</button>
+      <div class="pname"><span>${PROFILE_ICON[k]} ${escapeHtml(t(state.lang, "profile_" + k))}</span>
+        <button class="linkbtn reset" data-reset="${k}" title="${escapeAttr(t(state.lang, "reset_default"))}" aria-label="${escapeAttr(t(state.lang, "reset_default"))}">↺</button></div>
       ${fieldsHtml(p)}
     </div>`;
   }).join("");
-  const cust = getCustom() || { name: "", temp: 22, precip: 0, wind: 10 };
+  const cust = withWeights(getCustom() || { name: "", temp: 22, precip: 0, wind: 10 });
   const customRow =
     `<div class="prow" data-custom="1">
       <div class="pname">✨ <input class="name-input" data-f="name" value="${escapeAttr(cust.name)}" placeholder="${escapeAttr(t(state.lang, "field_name"))}"></div>
-      <span></span>
       ${fieldsHtml(cust)}
     </div>`;
 
@@ -529,6 +535,7 @@ function openProfileModal() {
         <button class="icon-btn" id="modalClose">✕</button>
       </div>
       <h3>${escapeHtml(t(state.lang, "edit_builtin_title"))}</h3>
+      <p class="modal-hint">${escapeHtml(t(state.lang, "weight_hint"))}</p>
       ${builtins}
       <h3>${escapeHtml(t(state.lang, "custom_title"))}</h3>
       ${customRow}
@@ -548,21 +555,47 @@ function openProfileModal() {
     row.querySelector('[data-f="temp"]').value = def.temp;
     row.querySelector('[data-f="precip"]').value = def.precip;
     row.querySelector('[data-f="wind"]').value = def.wind;
+    setBar(row.querySelector('[data-w="tw"]'), def.tw);
+    setBar(row.querySelector('[data-w="pw"]'), def.pw);
+    setBar(row.querySelector('[data-w="ww"]'), def.ww);
+  }));
+  $("profileModal").querySelectorAll(".wbar span").forEach((seg) => seg.addEventListener("click", () => {
+    const bar = seg.parentElement, lvl = +seg.dataset.lvl, cur = +bar.dataset.level;
+    setBar(bar, cur === lvl ? lvl - 1 : lvl);
   }));
 }
+function weightBar(wkey, weight) {
+  let s = "";
+  for (let i = 1; i <= 4; i++) s += `<span data-lvl="${i}" class="${i <= weight ? "on" : ""}"></span>`;
+  return `<div class="wbar" data-w="${wkey}" data-level="${weight}" role="slider" aria-valuemin="0" aria-valuemax="4" aria-valuenow="${weight}">${s}</div>`;
+}
+function setBar(bar, lvl) {
+  bar.dataset.level = lvl;
+  bar.setAttribute("aria-valuenow", lvl);
+  bar.querySelectorAll("span").forEach((s) => s.classList.toggle("on", +s.dataset.lvl <= lvl));
+}
+function critHtml(labelKey, key, val, wkey, weight) {
+  return `<div class="crit"><span class="clabel">${escapeHtml(t(state.lang, labelKey))}</span>` +
+    `<input class="cinput" type="number" data-f="${key}" value="${val}">${weightBar(wkey, weight)}</div>`;
+}
 function fieldsHtml(p) {
-  const f = (key, label, val) => `<label class="field">${escapeHtml(t(state.lang, label))}<input type="number" data-f="${key}" value="${val}"></label>`;
-  return `<div class="fields">${f("temp", "field_temp", p.temp)}${f("precip", "field_precip", p.precip)}${f("wind", "field_wind", p.wind)}</div>`;
+  return `<div class="crits">` +
+    critHtml("field_temp", "temp", p.temp, "tw", p.tw) +
+    critHtml("field_precip", "precip", p.precip, "pw", p.pw) +
+    critHtml("field_wind", "wind", p.wind, "ww", p.ww) +
+    `</div>`;
 }
 function readPoint(row) {
   const v = (k) => parseFloat(row.querySelector(`[data-f="${k}"]`).value);
-  return { temp: v("temp"), precip: v("precip"), wind: v("wind") };
+  const w = (k) => parseInt(row.querySelector(`[data-w="${k}"]`).dataset.level);
+  return { temp: v("temp"), precip: v("precip"), wind: v("wind"), tw: w("tw"), pw: w("pw"), ww: w("ww") };
 }
 function saveProfiles() {
   const overrides = {};
   $("profileModal").querySelectorAll("[data-builtin]").forEach((row) => {
     const k = row.dataset.builtin, p = readPoint(row), def = PROFILE_DEFAULTS[k];
-    if (p.temp !== def.temp || p.precip !== def.precip || p.wind !== def.wind) overrides[k] = p;
+    const same = ["temp", "precip", "wind", "tw", "pw", "ww"].every((f) => p[f] === def[f]);
+    if (!same) overrides[k] = p;
   });
   setOverrides(overrides);
   const crow = $("profileModal").querySelector("[data-custom]");

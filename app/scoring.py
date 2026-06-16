@@ -1,10 +1,10 @@
 """How 'the best weather' is decided.
 
-Every profile, built-in or custom, is one ideal point: a target temperature,
-target precipitation and target wind. A day scores by how close it sits to that
-point. The ideal point encodes as a short code (`t25p0w5`) that doubles as the
-profile's URL segment, so built-ins, user-tweaked built-ins and fully custom
-profiles all run through the same engine.
+Every profile is an ideal point (target temperature, precipitation and wind)
+plus a weight 0-3 for each of those three. A day scores by how close it sits to
+the point, weighted. The point and weights encode as a short code
+(`t25p0w5-231`) that doubles as the profile's URL segment, so built-ins,
+tweaked built-ins and custom profiles all run through the same engine.
 """
 
 import re
@@ -15,22 +15,20 @@ from .models import DayForecast
 
 Criterion = Callable[[DayForecast], float]
 
-# Relative importance of (temperature, precipitation, wind) in the score.
-WEIGHTS = (2.0, 1.5, 1.0)
-
-# Default ideal point per built-in profile: (temp °C, precip mm, wind km/h).
-DEFAULTS: Dict[str, Tuple[float, float, float]] = {
-    "general": (24, 0, 10),
-    "beach": (29, 0, 8),
-    "bbq": (24, 0, 8),
-    "outdoor": (16, 0, 16),
-    "windwater": (20, 0, 32),
-    "skating": (-6, 0, 8),
-    "skiing": (-3, 6, 12),
+# Default ideal point + weights per built-in profile:
+# (temp °C, precip mm, wind km/h, temp weight, precip weight, wind weight).
+DEFAULTS: Dict[str, Tuple[float, float, float, int, int, int]] = {
+    "general": (24, 0, 10, 2, 3, 1),
+    "beach": (29, 0, 8, 3, 2, 1),
+    "bbq": (24, 0, 8, 1, 3, 2),
+    "outdoor": (16, 0, 16, 2, 2, 1),
+    "windwater": (20, 0, 32, 1, 1, 3),
+    "skating": (-6, 0, 8, 3, 2, 1),
+    "skiing": (-3, 6, 12, 2, 3, 1),
 }
 DEFAULT = "general"
+WEIGHTS_FALLBACK = (2, 3, 1)
 
-# URL slugs for built-in profiles (Dutch, used as the activity URL segment).
 SLUGS: Dict[str, str] = {
     "general": "algemeen",
     "beach": "strand",
@@ -43,7 +41,9 @@ SLUGS: Dict[str, str] = {
 _KEY_BY_SLUG = {slug: key for key, slug in SLUGS.items()}
 _KEY_BY_SLUG.update({key: key for key in DEFAULTS})
 
-_CUSTOM_RE = re.compile(r"^t(-?\d+(?:\.\d+)?)p(\d+(?:\.\d+)?)w(\d+(?:\.\d+)?)$")
+_CUSTOM_RE = re.compile(
+    r"^t(-?\d+(?:\.\d+)?)p(\d+(?:\.\d+)?)w(\d+(?:\.\d+)?)(?:-([0-4])([0-4])([0-4]))?$"
+)
 
 
 def _clamp01(x: float) -> float:
@@ -64,39 +64,41 @@ class Profile:
         return 100.0 * sum(w * f(day) for w, f in self.terms) / total
 
 
-def profile_from_point(temp: float, precip: float, wind: float, key: str = "custom") -> Profile:
-    return Profile(
-        key,
-        (
-            (WEIGHTS[0], _near(lambda d: d.temp_max, temp, 12.0)),
-            (WEIGHTS[1], _near(lambda d: d.precip_mm, precip, 8.0)),
-            (WEIGHTS[2], _near(lambda d: d.wind_kmh, wind, 30.0)),
-        ),
-    )
+def profile_from_values(temp, precip, wind, tw, pw, ww, key="custom") -> Profile:
+    terms = []
+    if tw:
+        terms.append((tw, _near(lambda d: d.temp_max, float(temp), 12.0)))
+    if pw:
+        terms.append((pw, _near(lambda d: d.precip_mm, float(precip), 8.0)))
+    if ww:
+        terms.append((ww, _near(lambda d: d.wind_kmh, float(wind), 30.0)))
+    if not terms:  # all weights zero -> fall back to temperature
+        terms.append((1, _near(lambda d: d.temp_max, float(temp), 12.0)))
+    return Profile(key, tuple(terms))
 
 
-def parse_custom_code(code: str) -> Optional[Tuple[float, float, float]]:
-    """`t25p0w5` -> (25, 0, 5), or None."""
+def parse_custom_code(code: str):
+    """`t25p0w5-231` -> (temp, precip, wind, tw, pw, ww), or None."""
     m = _CUSTOM_RE.match(code or "")
     if not m:
         return None
-    return float(m.group(1)), float(m.group(2)), float(m.group(3))
-
-
-def custom_code(temp: float, precip: float, wind: float) -> str:
-    n = lambda x: int(x) if float(x).is_integer() else x
-    return f"t{n(temp)}p{n(precip)}w{n(wind)}"
+    temp, precip, wind = float(m.group(1)), float(m.group(2)), float(m.group(3))
+    if m.group(4) is not None:
+        tw, pw, ww = int(m.group(4)), int(m.group(5)), int(m.group(6))
+    else:
+        tw, pw, ww = WEIGHTS_FALLBACK
+    return temp, precip, wind, tw, pw, ww
 
 
 def resolve_profile(activity: Optional[str]) -> Profile:
     """Map a URL activity segment (built-in slug or custom code) to a Profile."""
     key = _KEY_BY_SLUG.get(activity or SLUGS[DEFAULT])
     if key:
-        return profile_from_point(*DEFAULTS[key], key=key)
-    point = parse_custom_code(activity or "")
-    if point:
-        return profile_from_point(*point)
-    return profile_from_point(*DEFAULTS[DEFAULT], key=DEFAULT)
+        return profile_from_values(*DEFAULTS[key], key=key)
+    parsed = parse_custom_code(activity or "")
+    if parsed:
+        return profile_from_values(*parsed)
+    return profile_from_values(*DEFAULTS[DEFAULT], key=DEFAULT)
 
 
 def merge_best(best: Dict[str, DayForecast], new_days, source: str, profile: Profile) -> bool:
